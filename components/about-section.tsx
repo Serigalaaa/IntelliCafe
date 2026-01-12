@@ -1,5 +1,8 @@
+"use client"
+
 import { Card, CardContent } from "@/components/ui/card"
 import { Menu, MessageSquare, ThumbsUp } from "lucide-react"
+import Link from "next/link" // 1. Import Link
 
 export function AboutSection() {
   const features = [
@@ -8,18 +11,21 @@ export function AboutSection() {
       title: "Smart Menu",
       description:
         "Browse our intelligent menu system with real-time availability, personalized recommendations, and detailed nutritional information.",
+      href: "/menu", // 2. Add destination
     },
     {
       icon: MessageSquare,
       title: "Chatbot Assistant",
       description:
         "Get instant help from our AI-powered chatbot. Ask questions, place orders, and receive personalized suggestions 24/7.",
+      href: "/chatbot", // 2. Add destination
     },
     {
       icon: ThumbsUp,
       title: "Feedback Icons",
       description:
         "Share your experience with our interactive feedback system. Your opinions help us serve you better every day.",
+      href: "/feedback", // 2. Add destination
     },
   ]
 
@@ -40,18 +46,20 @@ export function AboutSection() {
         {/* Features Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {features.map((feature, index) => (
-            <Card
-              key={index}
-              className="border-border bg-card hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group"
-            >
-              <CardContent className="p-8 text-center">
-                <div className="mb-6 inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
-                  <feature.icon className="w-8 h-8" />
-                </div>
-                <h3 className="text-xl font-semibold text-card-foreground mb-3">{feature.title}</h3>
-                <p className="text-muted-foreground leading-relaxed text-pretty">{feature.description}</p>
-              </CardContent>
-            </Card>
+            // 3. Wrap the Card in a Link
+            <Link key={index} href={feature.href} className="block h-full">
+              <Card
+                className="h-full border-border bg-card hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group cursor-pointer"
+              >
+                <CardContent className="p-8 text-center">
+                  <div className="mb-6 inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
+                    <feature.icon className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-card-foreground mb-3">{feature.title}</h3>
+                  <p className="text-muted-foreground leading-relaxed text-pretty">{feature.description}</p>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       </div>

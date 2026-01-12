@@ -79,28 +79,32 @@ export function HeroSection() {
           alt="Café background"
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-foreground/70 via-foreground/50 to-foreground/70" />
+        {/* UPDATED: Using a consistent black overlay for better text contrast */}
+        <div className="absolute inset-0 bg-black/60" />
       </div>
 
       {/* Content */}
       <div className="relative z-10 container mx-auto px-4 text-center">
         {/* Dynamic Greeting */}
         <div className="mb-6 animate-fade-in">
-          <p className="text-accent-foreground/90 text-lg md:text-xl font-medium mb-2">
+          {/* UPDATED: Text is now white */}
+          <p className="text-white/90 text-lg md:text-xl font-medium mb-2 drop-shadow-md">
             {greeting}, Welcome to IntelliCafe!
           </p>
-          <p className="text-accent-foreground/70 text-sm md:text-base font-mono">
+          <p className="text-white/80 text-sm md:text-base font-mono">
             {currentTime}
           </p>
         </div>
 
         {/* Main Title */}
-        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-accent-foreground mb-6 animate-fade-in-up text-balance">
+        {/* UPDATED: Big, bold, white text with a shadow */}
+        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 animate-fade-in-up text-balance drop-shadow-xl">
           Welcome to IntelliCafe
         </h1>
 
         {/* Subtitle */}
-        <p className="text-lg md:text-xl lg:text-2xl text-accent-foreground/90 mb-12 max-w-3xl mx-auto animate-fade-in-up text-pretty">
+        {/* UPDATED: Lighter white text */}
+        <p className="text-lg md:text-xl lg:text-2xl text-white/90 mb-12 max-w-3xl mx-auto animate-fade-in-up text-pretty drop-shadow-md">
           An Interactive and Intelligent Web-based Café System
         </p>
 
@@ -110,7 +114,13 @@ export function HeroSection() {
             Login
           </Button>
 
-          <Button size="lg" variant="outline" onClick={handleSignup}>
+          {/* UPDATED: Styled outline button to be white on dark background */}
+          <Button 
+            size="lg" 
+            variant="outline" 
+            onClick={handleSignup}
+            className="border-white text-white bg-transparent hover:bg-white hover:text-black transition-colors"
+          >
             <UserPlus className="w-5 h-5 mr-2" />
             Sign Up
           </Button>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ShoppingCart, Plus, Minus } from "lucide-react"
+import { ShoppingCart, Plus, Minus, SearchX } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import Image from "next/image"
 import { useCartStore } from "@/lib/cart-store"
@@ -16,6 +16,7 @@ interface MenuItem {
   category: string
   image: string
   available: boolean
+  stock: number; // Ensure this matches your DB
 }
 
 interface MenuGridProps {
@@ -29,21 +30,21 @@ export function MenuGrid({ category }: MenuGridProps) {
   const { items: cartItems, addItem, updateQuantity } = useCartStore()
 
   useEffect(() => {
+    const fetchMenuItems = async () => {
+      setLoading(true)
+      try {
+        const response = await fetch(`/api/menu?category=${category}`)
+        const data = await response.json()
+        setItems(data)
+      } catch (error) {
+        console.error("Failed to fetch menu items:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
     fetchMenuItems()
   }, [category])
-
-  const fetchMenuItems = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/menu?category=${category}`)
-      const data = await response.json()
-      setItems(data)
-    } catch (error) {
-      console.error("Failed to fetch menu items:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const getItemQuantity = (itemId: string) => {
     const cartItem = cartItems.find((item) => item._id === itemId)
@@ -61,7 +62,12 @@ export function MenuGrid({ category }: MenuGridProps) {
 
   const handleIncrement = (item: MenuItem) => {
     const currentQuantity = getItemQuantity(item._id)
-    updateQuantity(item._id, currentQuantity + 1)
+    // Optional: Prevent adding more than stock
+    if (currentQuantity < item.stock) {
+        updateQuantity(item._id, currentQuantity + 1)
+    } else {
+        alert("Sorry, we don't have enough stock!")
+    }
   }
 
   const handleDecrement = (itemId: string) => {
@@ -83,19 +89,34 @@ export function MenuGrid({ category }: MenuGridProps) {
     )
   }
 
+  if (!loading && items.length === 0) {
+    return (
+      <div className="col-span-full flex flex-col items-center justify-center py-16 text-muted-foreground">
+        <div className="bg-muted p-4 rounded-full mb-4">
+          <SearchX className="w-8 h-8" />
+        </div>
+        <h3 className="text-xl font-semibold mb-2">No items found</h3>
+        <p>We couldn't find any items in the "{category}" category.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {items.map((item) => {
         const quantity = getItemQuantity(item._id)
+        // Check if item is out of stock (either stock is 0 OR available is false)
+        const isOutOfStock = item.stock <= 0 || !item.available;
+        const isLowStock = item.stock > 0 && item.stock < 5;
 
         return (
           <Card key={item._id} className="overflow-hidden hover:shadow-lg transition-shadow">
-            <div className="aspect-square relative overflow-hidden bg-muted">
+            <div className="aspect-square relative overflow-hidden bg-muted group">
               <Image
                 src={item.image || "/placeholder.svg"}
                 alt={item.name}
                 fill
-                className="object-cover hover:scale-105 transition-transform duration-300"
+                className={`object-cover transition-transform duration-300 ${!isOutOfStock ? "group-hover:scale-105" : "grayscale"}`}
                 onError={(e) => {
                   const target = e.target as HTMLImageElement
                   target.style.display = "none"
@@ -108,14 +129,26 @@ export function MenuGrid({ category }: MenuGridProps) {
                   }
                 }}
               />
-              {!item.available && <Badge className="absolute top-3 right-3 bg-destructive">Out of Stock</Badge>}
+              
+              {/* --- STOCK BADGES --- */}
+              {isOutOfStock && (
+                <Badge className="absolute top-3 right-3 bg-destructive hover:bg-destructive">
+                    Out of Stock
+                </Badge>
+              )}
+              {!isOutOfStock && isLowStock && (
+                <Badge className="absolute top-3 right-3 bg-orange-500 hover:bg-orange-600">
+                    Only {item.stock} left
+                </Badge>
+              )}
             </div>
+
             <div className="p-6">
               <div className="flex items-start justify-between mb-2">
                 <h3 className="text-xl font-semibold text-foreground">{item.name}</h3>
                 <span className="text-lg font-bold text-primary">RM{item.price.toFixed(2)}</span>
               </div>
-              <p className="text-sm text-muted-foreground mb-4">{item.description}</p>
+              <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{item.description}</p>
 
               {quantity > 0 ? (
                 <div className="flex items-center justify-between">
@@ -128,15 +161,20 @@ export function MenuGrid({ category }: MenuGridProps) {
                       <Plus className="w-4 h-4" />
                     </Button>
                   </div>
-                  <Button size="sm" className="gap-2">
+                  <Button size="sm" className="gap-2 pointer-events-none opacity-90">
                     <ShoppingCart className="w-4 h-4" />
                     In Cart
                   </Button>
                 </div>
               ) : (
-                <Button className="w-full gap-2" onClick={() => handleAddToCart(item)} disabled={!item.available}>
+                <Button 
+                  className="w-full gap-2" 
+                  onClick={() => handleAddToCart(item)} 
+                  disabled={isOutOfStock} // Disable if out of stock
+                  variant={isOutOfStock ? "secondary" : "default"}
+                >
                   <ShoppingCart className="w-4 h-4" />
-                  Add to Cart
+                  {isOutOfStock ? "Out of Stock" : "Add to Cart"}
                 </Button>
               )}
             </div>

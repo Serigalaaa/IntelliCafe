@@ -1,20 +1,57 @@
 "use client"
 
+import { useState } from "react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
-import { ShoppingCart, Plus, Minus, Trash2 } from "lucide-react"
+import { ShoppingCart, Plus, Minus, Trash2, Loader2 } from "lucide-react"
 import { useCartStore } from "@/lib/cart-store"
 import { Badge } from "@/components/ui/badge"
 import Image from "next/image"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useGlobalModal } from "@/components/providers/modal-provider" // 1. Import Modal
 
 export function CartSidebar() {
   const { items, updateQuantity, removeItem, getTotalItems, getTotalPrice, clearCart } = useCartStore()
   const totalItems = getTotalItems()
   const totalPrice = getTotalPrice()
 
+  // 2. Local state for loading
+  const [isCheckingOut, setIsCheckingOut] = useState(false)
+  const [isOpen, setIsOpen] = useState(false) // To control closing the sheet
+  
+  // 3. Use Global Modal for feedback
+  const { showSuccess, showError } = useGlobalModal()
+
+  const handleCheckout = async () => {
+    setIsCheckingOut(true)
+
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        // Success Logic
+        clearCart()
+        setIsOpen(false) // Close sidebar
+        showSuccess("Order Placed!", "Thank you for your purchase. Your order is being prepared.")
+      } else {
+        // Error Logic (e.g., Out of stock)
+        showError("Checkout Failed", result.error || "Something went wrong.")
+      }
+    } catch (error) {
+      showError("System Error", "Could not connect to the server.")
+    } finally {
+      setIsCheckingOut(false)
+    }
+  }
+
   return (
-    <Sheet>
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <Button variant="outline" size="icon" className="relative bg-transparent">
           <ShoppingCart className="h-5 w-5" />
@@ -47,13 +84,14 @@ export function CartSidebar() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-sm truncate">{item.name}</h4>
-                      <p className="text-sm font-bold text-primary mt-1">RM{item.price.toFixed(2)}</p>
+                      <p className="text-sm font-bold text-primary">RM{item.price.toFixed(2)}</p>
                       <div className="flex items-center gap-2 mt-2">
                         <Button
                           size="sm"
                           variant="outline"
                           className="h-7 w-7 p-0 bg-transparent"
                           onClick={() => updateQuantity(item._id, item.quantity - 1)}
+                          disabled={isCheckingOut}
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
@@ -63,6 +101,7 @@ export function CartSidebar() {
                           variant="outline"
                           className="h-7 w-7 p-0 bg-transparent"
                           onClick={() => updateQuantity(item._id, item.quantity + 1)}
+                          disabled={isCheckingOut}
                         >
                           <Plus className="h-3 w-3" />
                         </Button>
@@ -71,6 +110,7 @@ export function CartSidebar() {
                           variant="ghost"
                           className="h-7 w-7 p-0 ml-auto text-destructive"
                           onClick={() => removeItem(item._id)}
+                          disabled={isCheckingOut}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -90,10 +130,28 @@ export function CartSidebar() {
                 <span className="text-primary">RM{totalPrice.toFixed(2)}</span>
               </div>
               <div className="space-y-2">
-                <Button className="w-full" size="lg">
-                  Checkout
+                {/* CHECKOUT BUTTON */}
+                <Button 
+                  className="w-full" 
+                  size="lg" 
+                  onClick={handleCheckout} 
+                  disabled={isCheckingOut}
+                >
+                  {isCheckingOut ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    "Checkout"
+                  )}
                 </Button>
-                <Button variant="outline" className="w-full bg-transparent" onClick={clearCart}>
+                
+                <Button 
+                  variant="outline" 
+                  className="w-full bg-transparent" 
+                  onClick={clearCart}
+                  disabled={isCheckingOut}
+                >
                   Clear Cart
                 </Button>
               </div>

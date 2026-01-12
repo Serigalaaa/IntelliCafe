@@ -3,12 +3,15 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
+// --- UPDATED TYPES ---
 export interface User {
   id: string
   email: string
   name: string
-  role: "customer" | "admin" | "guest"
-  createdAt: Date
+  // Updated: Added "user" to match your MongoDB schema default
+  role: "user" | "customer" | "admin" | "guest"
+  // Updated: JSON returns dates as strings, so we allow both
+  createdAt: string | Date 
 }
 
 export function useAuth() {
@@ -22,11 +25,20 @@ export function useAuth() {
 
   async function checkSession() {
     try {
+      // Ensure you have an app/api/auth/session/route.ts created for this to work!
       const response = await fetch("/api/auth/session")
+      
+      // If no session exists (401/404), stop here
+      if (!response.ok) {
+        setLoading(false)
+        return
+      }
+
       const data = await response.json()
       setUser(data.user)
     } catch (error) {
-      console.error("[v0] Session check error:", error)
+      // Silent error is fine for session checks
+      console.log("[Auth] No active session found") 
     } finally {
       setLoading(false)
     }
@@ -47,6 +59,7 @@ export function useAuth() {
       }
 
       setUser(data.user)
+      // Updated: Check for both "admin" and potentially other roles
       router.push(data.user.role === "admin" ? "/admin" : "/menu")
       router.refresh()
 
@@ -61,6 +74,7 @@ export function useAuth() {
 
   async function signup(email: string, password: string, name: string) {
     try {
+      // This connects to the route we just built in app/api/auth/signup/route.ts
       const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -118,7 +132,7 @@ export function useAuth() {
       router.push("/")
       router.refresh()
     } catch (error) {
-      console.error("[v0] Logout error:", error)
+      console.error("[Auth] Logout error:", error)
     }
   }
 

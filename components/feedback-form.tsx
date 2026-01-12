@@ -1,16 +1,22 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
+import { useRouter } from "next/navigation" // Import router for refreshing server components
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Star } from "lucide-react"
+import { Star, Loader2 } from "lucide-react"
 
-export function FeedbackForm() {
+// Define props to accept a callback function
+interface FeedbackFormProps {
+  onFeedbackSubmitted?: () => void
+}
+
+export function FeedbackForm({ onFeedbackSubmitted }: FeedbackFormProps) {
+  const router = useRouter()
   const [rating, setRating] = useState(0)
   const [hoveredRating, setHoveredRating] = useState(0)
   const [formData, setFormData] = useState({
@@ -32,9 +38,19 @@ export function FeedbackForm() {
       })
 
       if (response.ok) {
-        alert("Thank you for your feedback!")
+        // 1. Reset the form
         setFormData({ name: "", email: "", message: "" })
         setRating(0)
+        
+        // 2. Refresh the page data (Useful if using Server Components)
+        router.refresh()
+
+        // 3. Trigger the manual update callback (Useful if using Client State)
+        if (onFeedbackSubmitted) {
+          onFeedbackSubmitted()
+        }
+
+        alert("Thank you for your feedback!")
       }
     } catch (error) {
       console.error("Failed to submit feedback:", error)
@@ -79,7 +95,7 @@ export function FeedbackForm() {
                 onClick={() => setRating(star)}
                 onMouseEnter={() => setHoveredRating(star)}
                 onMouseLeave={() => setHoveredRating(0)}
-                className="transition-transform hover:scale-110"
+                className="transition-transform hover:scale-110 focus:outline-none"
               >
                 <Star
                   className={`w-8 h-8 ${
@@ -103,6 +119,7 @@ export function FeedbackForm() {
         </div>
 
         <Button type="submit" className="w-full" disabled={submitting || rating === 0}>
+          {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {submitting ? "Submitting..." : "Submit Feedback"}
         </Button>
       </form>

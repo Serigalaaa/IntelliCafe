@@ -3,21 +3,57 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Edit, Trash } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Edit, Trash, Plus, Loader2, ImageIcon, Package } from "lucide-react"
+import { useGlobalModal } from "@/components/providers/modal-provider"
 
 interface MenuItem {
   _id: string
   name: string
   description: string
   price: number
+  stock: number // <--- NEW FIELD
   category: string
   image: string
   available: boolean
 }
 
+const CATEGORIES = ["coffee", "tea", "pastry", "sandwich", "dessert"]
+
 export function AdminMenuManager() {
   const [items, setItems] = useState<MenuItem[]>([])
-  const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  const { showSuccess, showError } = useGlobalModal()
+
+  const [editingId, setEditingId] = useState<string | null>(null)
+  
+  // Initialize form with stock: 20
+  const [formData, setFormData] = useState<Partial<MenuItem>>({
+    name: "",
+    description: "",
+    price: 0,
+    stock: 20, // <--- DEFAULT STOCK
+    category: "coffee",
+    image: "", 
+    available: true,
+  })
 
   useEffect(() => {
     fetchMenuItems()
@@ -30,35 +66,206 @@ export function AdminMenuManager() {
       setItems(data)
     } catch (error) {
       console.error("Failed to fetch menu items:", error)
+      showError("Connection Error", "Could not load menu items.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const resetForm = () => {
+    setEditingId(null)
+    setFormData({
+      name: "",
+      description: "",
+      price: 0,
+      stock: 20, // Reset stock to 20
+      category: "coffee",
+      image: "", 
+      available: true,
+    })
+  }
+
+  const handleOpenAdd = () => {
+    resetForm()
+    setIsDialogOpen(true)
+  }
+
+  const handleOpenEdit = (item: MenuItem) => {
+    setEditingId(item._id)
+    setFormData(item)
+    setIsDialogOpen(true)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+
+    try {
+      const url = editingId ? `/api/menu/${editingId}` : "/api/menu"
+      const method = editingId ? "PUT" : "POST"
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      })
+
+      if (res.ok) {
+        setIsDialogOpen(false)
+        fetchMenuItems()
+        resetForm()
+        showSuccess(editingId ? "Item Updated" : "Item Created", "Inventory updated successfully.")
+      } else {
+        showError("Save Failed", "Could not save the menu item.")
+      }
+    } catch (error) {
+      showError("System Error", "An unexpected error occurred.")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this item?")) return
-
     try {
-      await fetch(`/api/menu/${id}`, { method: "DELETE" })
-      fetchMenuItems()
+      const res = await fetch(`/api/menu/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        fetchMenuItems()
+        showSuccess("Deleted", "The menu item has been removed.")
+      }
     } catch (error) {
-      console.error("Failed to delete item:", error)
+      showError("Error", "An error occurred while deleting.")
     }
   }
 
   return (
     <div className="space-y-6">
       <Card className="p-6">
-        <h2 className="text-2xl font-bold mb-4">Menu Items</h2>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Menu Management</h2>
+          <Button onClick={handleOpenAdd}>
+            <Plus className="w-4 h-4 mr-2" /> Add Item
+          </Button>
+        </div>
+
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingId ? "Edit Item" : "Add New Item"}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Name */}
+              <div>
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                {/* Price */}
+                <div>
+                  <Label htmlFor="price">Price (RM)</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.10"
+                    value={formData.price || ""}
+                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+                    required
+                  />
+                </div>
+                {/* Stock - NEW INPUT */}
+                <div>
+                  <Label htmlFor="stock">Stock Qty</Label>
+                  <Input
+                    id="stock"
+                    type="number"
+                    value={formData.stock || 0}
+                    onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) })}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Category */}
+              <div>
+                <Label htmlFor="category">Category</Label>
+                <Select 
+                  value={formData.category} 
+                  onValueChange={(val) => setFormData({ ...formData, category: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Description */}
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Input
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                />
+              </div>
+
+              {/* Image */}
+              <div>
+                <Label htmlFor="image">Image Path</Label>
+                <Input
+                  id="image"
+                  placeholder="/images/espresso.jpg"
+                  value={formData.image}
+                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                />
+              </div>
+
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {editingId ? "Update Item" : "Create Item"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* List */}
         <div className="space-y-4">
           {items.map((item) => (
-            <div key={item._id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-              <div>
-                <h3 className="font-semibold">{item.name}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {item.category} - RM{item.price}
+            <div key={item._id} className="flex items-center gap-4 p-4 border border-border rounded-lg hover:bg-accent/5 transition-colors">
+              <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-md border bg-muted flex items-center justify-center">
+                 {item.image ? (
+                    <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+                 ) : <ImageIcon className="h-6 w-6 text-muted-foreground" />}
+              </div>
+
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                    <h3 className="font-semibold">{item.name}</h3>
+                    {/* STOCK BADGE */}
+                    <div className={`text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1 ${item.stock > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                        <Package className="w-3 h-3" />
+                        {item.stock > 0 ? `${item.stock} in stock` : "Out of Stock"}
+                    </div>
+                </div>
+                <p className="text-sm text-muted-foreground capitalize">
+                  {item.category} • RM{item.price ? item.price.toFixed(2) : "0.00"}
                 </p>
               </div>
+
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => setEditingItem(item)}>
+                <Button size="sm" variant="outline" onClick={() => handleOpenEdit(item)}>
                   <Edit className="w-4 h-4" />
                 </Button>
                 <Button size="sm" variant="destructive" onClick={() => handleDelete(item._id)}>
