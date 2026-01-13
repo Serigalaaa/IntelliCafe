@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
 import { CafeGame } from "@/components/cafe-game"
 import { CategorizationGame } from "@/components/categorization-game"
 import { Button } from "@/components/ui/button"
@@ -61,7 +60,6 @@ export default function GamePage() {
         </div>
       </div>
 
-      <Footer />
     </main>
   )
 }

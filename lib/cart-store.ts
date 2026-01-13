@@ -1,76 +1,84 @@
-import { create } from "zustand"
-import { persist } from "zustand/middleware"
+import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 export interface CartItem {
   _id: string
   name: string
   price: number
-  quantity: number
   image: string
+  quantity: number
 }
 
-interface CartStore {
+export interface OrderReceipt {
+  orderNumber: string
   items: CartItem[]
+  total: number
+  date: string
+  status: string
+}
+
+interface CartState {
+  items: CartItem[]
+  orderHistory: OrderReceipt[]
   addItem: (item: Omit<CartItem, "quantity">) => void
   removeItem: (id: string) => void
   updateQuantity: (id: string, quantity: number) => void
   clearCart: () => void
+  addOrder: (order: OrderReceipt) => void
+  clearOrderHistory: () => void; // <--- NEW ACTION
   getTotalItems: () => number
   getTotalPrice: () => number
 }
 
-export const useCartStore = create<CartStore>()(
+export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
+      orderHistory: [],
 
-      addItem: (item) => {
-        set((state) => {
-          const existingItem = state.items.find((i) => i._id === item._id)
+      addItem: (data) => {
+        const currentItems = get().items
+        const existingItem = currentItems.find((item) => item._id === data._id)
 
-          if (existingItem) {
-            return {
-              items: state.items.map((i) => (i._id === item._id ? { ...i, quantity: i.quantity + 1 } : i)),
-            }
-          }
-
-          return {
-            items: [...state.items, { ...item, quantity: 1 }],
-          }
-        })
+        if (existingItem) {
+          set({
+            items: currentItems.map((item) =>
+              item._id === data._id ? { ...item, quantity: item.quantity + 1 } : item
+            ),
+          })
+        } else {
+          set({ items: [...currentItems, { ...data, quantity: 1 }] })
+        }
       },
 
       removeItem: (id) => {
-        set((state) => ({
-          items: state.items.filter((item) => item._id !== id),
-        }))
+        set({ items: get().items.filter((item) => item._id !== id) })
       },
 
       updateQuantity: (id, quantity) => {
-        if (quantity <= 0) {
-          get().removeItem(id)
-          return
-        }
-
-        set((state) => ({
-          items: state.items.map((item) => (item._id === id ? { ...item, quantity } : item)),
-        }))
+        if (quantity < 1) return
+        set({
+          items: get().items.map((item) =>
+            item._id === id ? { ...item, quantity } : item
+          ),
+        })
       },
 
-      clearCart: () => {
-        set({ items: [] })
-      },
+      clearCart: () => set({ items: [] }),
 
-      getTotalItems: () => {
-        return get().items.reduce((total, item) => total + item.quantity, 0)
-      },
+      addOrder: (order) => set((state) => ({ 
+        orderHistory: [order, ...state.orderHistory] 
+      })),
 
-      getTotalPrice: () => {
-        return get().items.reduce((total, item) => total + item.price * item.quantity, 0)
-      },
+      // NEW: Clears history (Call this on Logout)
+      clearOrderHistory: () => set({ orderHistory: [] }),
+
+      getTotalItems: () => get().items.reduce((total, item) => total + item.quantity, 0),
+      getTotalPrice: () => get().items.reduce((total, item) => total + item.price * item.quantity, 0),
     }),
     {
       name: "intellicafe-cart",
-    },
-  ),
+      storage: createJSONStorage(() => localStorage),
+    }
+  )
 )

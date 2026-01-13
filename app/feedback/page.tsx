@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
 import { FeedbackForm } from "@/components/feedback-form"
 import { FeedbackList } from "@/components/feedback-list"
 
@@ -38,7 +37,6 @@ export default function FeedbackPage() {
         </div>
       </div>
 
-      <Footer />
     </main>
   )
 }

@@ -40,7 +40,7 @@ A modern, full-stack café management system with authentication, AI-powered cha
 2. Install dependencies:
 ```bash
 npm install --legacy-peer-deps
-```
+npm install recharts date-fns --legacy-peer-deps```
 
 3. Set up environment variables:
    - Copy `.env.local.example` to `.env.local`

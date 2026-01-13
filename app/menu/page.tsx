@@ -1,7 +1,6 @@
 "use client"
 
 import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
 import { MenuGrid } from "@/components/menu-grid"
 import { CartSidebar } from "@/components/cart-sidebar"
 import { useState } from "react"
@@ -56,7 +55,6 @@ export default function MenuPage() {
         </div>
       </div>
 
-      <Footer />
     </main>
   )
 }

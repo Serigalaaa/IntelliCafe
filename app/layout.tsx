@@ -5,13 +5,13 @@ import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css" 
 import { Suspense } from "react"
-import { GlobalModalProvider } from "@/components/providers/modal-provider" // 1. Import the provider
+import { GlobalModalProvider } from "@/components/providers/modal-provider"
+import { Navigation } from "@/components/navigation"
+import { Footer } from "@/components/footer"
 
 export const metadata: Metadata = {
-  title: "IntelliCafe - An Interactive and Intelligent Web-based Café System",
-  description:
-    "Experience the future of café ordering with IntelliCafe - featuring smart menus, AI chatbot assistance, and interactive feedback systems.",
-  generator: "v0.app",
+  title: "IntelliCafe",
+  description: "Experience the future of café ordering.",
 }
 
 export default function RootLayout({
@@ -22,9 +22,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        {/* 2. Wrap everything inside the provider */}
         <GlobalModalProvider>
+          {/* Global Navigation (Visible on all pages) */}
+          <Navigation />
+          
+          {/* This renders the specific page content (Home, Menu, Admin, etc.) */}
           <Suspense fallback={null}>{children}</Suspense>
+          
+          {/* Global Footer (Visible on all pages) */}
+          <Footer />
         </GlobalModalProvider>
         <Analytics />
       </body>

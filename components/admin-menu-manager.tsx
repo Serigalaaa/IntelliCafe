@@ -18,7 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Edit, Trash, Plus, Loader2, ImageIcon, Package } from "lucide-react"
+// Added UploadIcon
+import { Edit, Trash, Plus, Loader2, ImageIcon, Package, UploadCloud } from "lucide-react" 
 import { useGlobalModal } from "@/components/providers/modal-provider"
 
 interface MenuItem {
@@ -26,7 +27,7 @@ interface MenuItem {
   name: string
   description: string
   price: number
-  stock: number // <--- NEW FIELD
+  stock: number
   category: string
   image: string
   available: boolean
@@ -40,16 +41,17 @@ export function AdminMenuManager() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   
-  const { showSuccess, showError } = useGlobalModal()
+  // New state for upload loading
+  const [isUploading, setIsUploading] = useState(false) 
 
+  const { showSuccess, showError } = useGlobalModal()
   const [editingId, setEditingId] = useState<string | null>(null)
   
-  // Initialize form with stock: 20
   const [formData, setFormData] = useState<Partial<MenuItem>>({
     name: "",
     description: "",
     price: 0,
-    stock: 20, // <--- DEFAULT STOCK
+    stock: 20,
     category: "coffee",
     image: "", 
     available: true,
@@ -78,7 +80,7 @@ export function AdminMenuManager() {
       name: "",
       description: "",
       price: 0,
-      stock: 20, // Reset stock to 20
+      stock: 20,
       category: "coffee",
       image: "", 
       available: true,
@@ -94,6 +96,36 @@ export function AdminMenuManager() {
     setEditingId(item._id)
     setFormData(item)
     setIsDialogOpen(true)
+  }
+
+  // --- NEW: Image Upload Handler ---
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsUploading(true)
+    const uploadData = new FormData()
+    uploadData.append("file", file)
+
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: uploadData,
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        // Automatically set the image path in our form data
+        setFormData((prev) => ({ ...prev, image: data.path }))
+        showSuccess("Upload Complete", "Image uploaded successfully")
+      } else {
+        showError("Upload Failed", "Could not upload image")
+      }
+    } catch (error) {
+      showError("Error", "Something went wrong during upload")
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -154,7 +186,6 @@ export function AdminMenuManager() {
               <DialogTitle>{editingId ? "Edit Item" : "Add New Item"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Name */}
               <div>
                 <Label htmlFor="name">Name</Label>
                 <Input
@@ -166,7 +197,6 @@ export function AdminMenuManager() {
               </div>
               
               <div className="grid grid-cols-2 gap-4">
-                {/* Price */}
                 <div>
                   <Label htmlFor="price">Price (RM)</Label>
                   <Input
@@ -178,7 +208,6 @@ export function AdminMenuManager() {
                     required
                   />
                 </div>
-                {/* Stock - NEW INPUT */}
                 <div>
                   <Label htmlFor="stock">Stock Qty</Label>
                   <Input
@@ -191,7 +220,6 @@ export function AdminMenuManager() {
                 </div>
               </div>
 
-              {/* Category */}
               <div>
                 <Label htmlFor="category">Category</Label>
                 <Select 
@@ -211,7 +239,6 @@ export function AdminMenuManager() {
                 </Select>
               </div>
 
-              {/* Description */}
               <div>
                 <Label htmlFor="description">Description</Label>
                 <Input
@@ -221,18 +248,42 @@ export function AdminMenuManager() {
                 />
               </div>
 
-              {/* Image */}
+              {/* --- IMAGE UPLOAD SECTION --- */}
               <div>
-                <Label htmlFor="image">Image Path</Label>
-                <Input
-                  id="image"
-                  placeholder="/images/espresso.jpg"
-                  value={formData.image}
-                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                />
+                <Label htmlFor="image">Item Image</Label>
+                <div className="flex gap-4 items-center mt-2">
+                  {/* Image Preview */}
+                  {formData.image ? (
+                    <div className="relative w-16 h-16 rounded-md overflow-hidden border">
+                      <img 
+                        src={formData.image} 
+                        alt="Preview" 
+                        className="w-full h-full object-cover" 
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 rounded-md border flex items-center justify-center bg-muted">
+                      <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  )}
+
+                  {/* File Input */}
+                  <div className="flex-1">
+                    <Input
+                      id="image"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={isUploading}
+                      className="cursor-pointer"
+                    />
+                    {isUploading && <p className="text-xs text-muted-foreground mt-1 animate-pulse">Uploading image...</p>}
+                    {!isUploading && formData.image && <p className="text-xs text-green-600 mt-1">Image path set: {formData.image}</p>}
+                  </div>
+                </div>
               </div>
 
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
+              <Button type="submit" className="w-full" disabled={isSubmitting || isUploading}>
                 {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 {editingId ? "Update Item" : "Create Item"}
               </Button>
@@ -240,7 +291,6 @@ export function AdminMenuManager() {
           </DialogContent>
         </Dialog>
 
-        {/* List */}
         <div className="space-y-4">
           {items.map((item) => (
             <div key={item._id} className="flex items-center gap-4 p-4 border border-border rounded-lg hover:bg-accent/5 transition-colors">
@@ -253,7 +303,6 @@ export function AdminMenuManager() {
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                     <h3 className="font-semibold">{item.name}</h3>
-                    {/* STOCK BADGE */}
                     <div className={`text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1 ${item.stock > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                         <Package className="w-3 h-3" />
                         {item.stock > 0 ? `${item.stock} in stock` : "Out of Stock"}
