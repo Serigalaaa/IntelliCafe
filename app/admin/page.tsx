@@ -48,7 +48,6 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <Footer />
     </main>
   )
 }

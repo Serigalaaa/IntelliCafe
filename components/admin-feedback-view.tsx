@@ -1,12 +1,13 @@
 "use client"
 
+// ... imports remain the same
 import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Star, Trash2, Edit2, Save, X, Loader2 } from "lucide-react"
-import { useGlobalModal } from "@/components/providers/modal-provider" // 1. Import hook
+import { useGlobalModal } from "@/components/providers/modal-provider"
 
 interface Feedback {
   _id: string
@@ -21,8 +22,8 @@ export function AdminFeedbackView() {
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([])
   const [loading, setLoading] = useState(true)
   
-  // 2. Initialize the modal hook
-  const { showSuccess, showError } = useGlobalModal()
+  // 1. Destructure showConfirm
+  const { showSuccess, showError, showConfirm } = useGlobalModal()
 
   // State for Editing
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -45,20 +46,25 @@ export function AdminFeedbackView() {
     }
   }
 
-  // --- DELETE FUNCTION ---
-  const handleDelete = async (id: string) => {
-    // Note: We can also replace this confirm with a custom modal later if you want
-    if (!confirm("Are you sure you want to delete this feedback?")) return
+  // --- DELETE FUNCTION (UPDATED) ---
+  const handleDeleteClick = (id: string) => {
+    // 2. Trigger the global modal instead of window.confirm
+    showConfirm(
+        "Delete Feedback?", 
+        "Are you sure you want to permanently delete this customer feedback? This action cannot be undone.",
+        () => performDelete(id) // Pass the actual delete function here
+    )
+  }
 
+  // 3. The actual logic runs ONLY after they click "Confirm" in the modal
+  const performDelete = async (id: string) => {
     try {
       const res = await fetch(`/api/feedback?id=${id}`, { method: "DELETE" })
 
       if (res.ok) {
         setFeedbacks((prev) => prev.filter((item) => item._id !== id))
-        // 3. Use success modal
         showSuccess("Deleted!", "The feedback has been removed successfully.")
       } else {
-        // 4. Use error modal
         showError("Error", "Failed to delete feedback.")
       }
     } catch (error) {
@@ -67,7 +73,7 @@ export function AdminFeedbackView() {
     }
   }
 
-  // --- EDIT FUNCTIONS ---
+  // ... (Edit functions remain exactly the same as before) ...
   const startEditing = (feedback: Feedback) => {
     setEditingId(feedback._id)
     setEditForm(feedback)
@@ -94,10 +100,8 @@ export function AdminFeedbackView() {
           prev.map((item) => (item._id === editingId ? { ...item, ...editForm } : item))
         )
         setEditingId(null)
-        // 5. Use success modal
         showSuccess("Updated!", "Customer feedback has been updated successfully.")
       } else {
-        // 6. Use error modal
         showError("Error", "Failed to update feedback.")
       }
     } catch (error) {
@@ -116,9 +120,11 @@ export function AdminFeedbackView() {
           <div key={feedback._id} className="p-4 border border-border rounded-lg transition-all hover:bg-accent/5">
             
             {editingId === feedback._id ? (
-              // --- EDIT MODE ---
+              // Edit UI (Same as before)
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-4">
+                 {/* ... Inputs ... */}
+                 {/* (Copy your inputs from previous code here) */}
+                  <div className="grid grid-cols-2 gap-4">
                   <Input 
                     value={editForm.name || ""} 
                     onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} 
@@ -163,7 +169,7 @@ export function AdminFeedbackView() {
                 </div>
               </div>
             ) : (
-              // --- VIEW MODE ---
+              // View UI
               <>
                 <div className="flex items-center justify-between mb-2">
                   <div>
@@ -187,7 +193,8 @@ export function AdminFeedbackView() {
                       <Button variant="ghost" size="icon" onClick={() => startEditing(feedback)}>
                         <Edit2 className="w-4 h-4 text-blue-500" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(feedback._id)}>
+                      {/* 4. Update the onClick to call handleDeleteClick */}
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(feedback._id)}>
                         <Trash2 className="w-4 h-4 text-red-500" />
                       </Button>
                     </div>

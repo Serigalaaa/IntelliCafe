@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Coffee, Croissant, Cookie, IceCream, Cake, Pizza, Sandwich, Donut } from "lucide-react"
+import { Coffee, Croissant, Cookie, IceCream, Cake, Pizza, Sandwich, Donut, Ticket, LogIn } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
+import { AuthModal } from "@/components/auth-modal"
 
 const icons = [Coffee, Croissant, Cookie, IceCream, Cake, Pizza, Sandwich, Donut]
 
@@ -19,6 +21,16 @@ export function CafeGame() {
   const [flippedCards, setFlippedCards] = useState<number[]>([])
   const [moves, setMoves] = useState(0)
   const [isWon, setIsWon] = useState(false)
+  
+  const [voucher, setVoucher] = useState<string | null>(null)
+  const { isAuthenticated, user } = useAuth()
+  
+  // Ref to prevent double-saving
+  const voucherSavedRef = useRef(false)
+
+  // Auth Modal State
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [authTab, setAuthTab] = useState<"login" | "signup">("login")
 
   useEffect(() => {
     initializeGame()
@@ -44,11 +56,40 @@ export function CafeGame() {
     }
   }, [flippedCards, cards])
 
+  // --- SAVE TO DB LOGIC ---
   useEffect(() => {
+    const saveVoucher = async (code: string) => {
+        if (!user) return
+        try {
+          await fetch("/api/vouchers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              code,
+              userId: user.id || user.id,
+              userName: user.name,
+              game: "Memory",
+              discount: "RM5 OFF"
+            }),
+          })
+          console.log("Memory Game Voucher saved")
+        } catch (error) {
+          console.error("Failed to save voucher:", error)
+        }
+    }
+
     if (cards.length > 0 && cards.every((card) => card.isMatched)) {
       setIsWon(true)
+      
+      if (isAuthenticated && !voucher && !voucherSavedRef.current) {
+        const randomCode = `WIN-${Math.random().toString(36).substring(2, 7).toUpperCase()}`
+        setVoucher(randomCode)
+        voucherSavedRef.current = true
+        
+        saveVoucher(randomCode)
+      }
     }
-  }, [cards])
+  }, [cards, isAuthenticated, voucher, user])
 
   const initializeGame = () => {
     const gameCards = [...icons, ...icons]
@@ -63,6 +104,8 @@ export function CafeGame() {
     setFlippedCards([])
     setMoves(0)
     setIsWon(false)
+    setVoucher(null)
+    voucherSavedRef.current = false // Reset save flag
   }
 
   const handleCardClick = (idx: number) => {
@@ -70,6 +113,11 @@ export function CafeGame() {
 
     setCards((prev) => prev.map((card, i) => (i === idx ? { ...card, isFlipped: true } : card)))
     setFlippedCards((prev) => [...prev, idx])
+  }
+
+  const openAuth = (tab: "login" | "signup") => {
+    setAuthTab(tab)
+    setShowAuthModal(true)
   }
 
   return (
@@ -82,8 +130,34 @@ export function CafeGame() {
       </div>
 
       {isWon && (
-        <Card className="p-6 mb-8 bg-primary/10 border-primary">
-          <h2 className="text-2xl font-bold text-center text-primary">Congratulations! You won in {moves} moves!</h2>
+        <Card className="p-6 mb-8 bg-primary/10 border-primary animate-in fade-in zoom-in duration-300">
+          <h2 className="text-2xl font-bold text-center text-primary mb-4">Congratulations! You won in {moves} moves!</h2>
+          
+          {isAuthenticated && voucher ? (
+             <div className="flex flex-col items-center justify-center space-y-3">
+                <p className="text-muted-foreground">Here is your discount voucher:</p>
+                <div className="bg-background border-2 border-dashed border-primary px-8 py-3 rounded-xl flex items-center gap-3 shadow-sm">
+                    <Ticket className="w-6 h-6 text-primary" />
+                    <span className="text-2xl font-mono font-bold tracking-widest text-foreground">{voucher}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Take a screenshot and show this to the barista!</p>
+             </div>
+          ) : (
+             <div className="text-center bg-background/50 p-6 rounded-lg border border-primary/20">
+                <p className="text-foreground font-bold text-lg">You Won!</p>
+                <p className="text-sm text-muted-foreground mt-1 mb-4">
+                   Registered members get a discount voucher for winning. Log in now to claim yours!
+                </p>
+                <div className="flex justify-center gap-3">
+                    <Button onClick={() => openAuth("login")} className="gap-2">
+                        <LogIn className="w-4 h-4" /> Log In
+                    </Button>
+                    <Button onClick={() => openAuth("signup")} variant="outline">
+                        Sign Up
+                    </Button>
+                </div>
+             </div>
+          )}
         </Card>
       )}
 
@@ -112,6 +186,8 @@ export function CafeGame() {
           )
         })}
       </div>
+
+      <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} defaultTab={authTab} />
     </div>
   )
 }

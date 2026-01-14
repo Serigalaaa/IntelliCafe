@@ -5,6 +5,8 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle2, XCircle, Trash2 } from "lucide-react"
+// 1. Import Hook
+import { useGlobalModal } from "@/components/providers/modal-provider"
 
 interface Order {
   _id: string
@@ -18,6 +20,9 @@ interface Order {
 export function AdminOrderManager() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+
+  // 2. Use Hook
+  const { showConfirm, showSuccess, showError } = useGlobalModal()
 
   useEffect(() => {
     fetchOrders()
@@ -50,27 +55,37 @@ export function AdminOrderManager() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to permanently delete this order record?")) return
+  // 3. Updated Delete Handler
+  const handleDeleteClick = (id: string) => {
+    showConfirm(
+      "Delete Order Record?",
+      "Are you sure you want to permanently delete this order history? This cannot be undone.",
+      () => performDelete(id)
+    )
+  }
+
+  const performDelete = async (id: string) => {
     try {
       const res = await fetch(`/api/orders?id=${id}`, { method: "DELETE" })
       if (res.ok) {
         setOrders(prev => prev.filter(o => o._id !== id))
+        showSuccess("Order Deleted", "The record has been removed.")
+      } else {
+        showError("Error", "Failed to delete order.")
       }
     } catch (error) {
-      console.error("Failed to delete order")
+      showError("System Error", "Could not connect to server.")
     }
   }
 
-  // --- NEW: Helper for Badge Colors ---
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending": 
-        return "bg-yellow-100 text-yellow-800 hover:bg-yellow-100 border-yellow-200" // Yellow
+        return "bg-yellow-100 text-yellow-800 hover:bg-yellow-100 border-yellow-200"
       case "done": 
-        return "bg-green-100 text-green-800 hover:bg-green-100 border-green-200" // Green
+        return "bg-green-100 text-green-800 hover:bg-green-100 border-green-200"
       case "cancelled": 
-        return "bg-red-100 text-red-800 hover:bg-red-100 border-red-200" // Red
+        return "bg-red-100 text-red-800 hover:bg-red-100 border-red-200"
       default: 
         return "bg-gray-100 text-gray-800"
     }
@@ -88,12 +103,9 @@ export function AdminOrderManager() {
           orders.map((order) => (
             <div key={order._id} className="border rounded-lg p-4 flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">
               
-              {/* Order Info */}
               <div className="space-y-1">
                 <div className="flex items-center gap-3">
                   <span className="font-mono font-bold text-lg">{order.orderNumber}</span>
-                  
-                  {/* CHANGED: Apply custom color classes */}
                   <Badge className={`border ${getStatusColor(order.status)}`}>
                     {order.status.toUpperCase()}
                   </Badge>
@@ -106,7 +118,6 @@ export function AdminOrderManager() {
                 </div>
               </div>
 
-              {/* Price & Actions */}
               <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
                 <span className="font-bold text-xl">RM{order.totalAmount.toFixed(2)}</span>
                 
@@ -132,7 +143,8 @@ export function AdminOrderManager() {
                       </span>
                   )}
 
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(order._id)} title="Delete Record">
+                  {/* 4. Use new handler */}
+                  <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(order._id)} title="Delete Record">
                     <Trash2 className="w-4 h-4 text-muted-foreground hover:text-red-600 transition-colors" />
                   </Button>
                 </div>

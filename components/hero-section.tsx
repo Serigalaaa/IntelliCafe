@@ -2,8 +2,10 @@
 
 import { Button } from "@/components/ui/button"
 import { useEffect, useState } from "react"
-import { LogIn, UserPlus, Users } from "lucide-react"
+import { LogIn, UserPlus, Users, Coffee, ArrowRight } from "lucide-react"
 import { AuthModal } from "@/components/auth-modal"
+import { useAuth } from "@/hooks/use-auth"
+import Link from "next/link"
 
 export function HeroSection() {
   const [greeting, setGreeting] = useState("")
@@ -11,132 +13,80 @@ export function HeroSection() {
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [authModalTab, setAuthModalTab] = useState<"login" | "signup">("login")
 
+  const { isAuthenticated, user } = useAuth()
+
   useEffect(() => {
     const updateGreeting = () => {
       const hour = new Date().getHours()
-
-      if (hour >= 5 && hour < 12) {
-        setGreeting("Good Morning")
-      } else if (hour >= 12 && hour < 17) {
-        setGreeting("Good Afternoon")
-      } else if (hour >= 17 && hour < 21) {
-        setGreeting("Good Evening")
-      } else {
-        setGreeting("Good Night")
-      }
+      if (hour >= 5 && hour < 12) setGreeting("Good Morning")
+      else if (hour >= 12 && hour < 17) setGreeting("Good Afternoon")
+      else if (hour >= 17 && hour < 21) setGreeting("Good Evening")
+      else setGreeting("Good Night")
     }
 
     const updateTime = () => {
       const now = new Date()
-      setCurrentTime(
-        now.toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        })
-      )
+      setCurrentTime(now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" }))
     }
 
     updateGreeting()
     updateTime()
-
-    const timeInterval = setInterval(updateTime, 1000)
-    const greetingInterval = setInterval(updateGreeting, 60000)
-
-    return () => {
-      clearInterval(timeInterval)
-      clearInterval(greetingInterval)
-    }
+    const t = setInterval(updateTime, 1000)
+    const g = setInterval(updateGreeting, 60000)
+    return () => { clearInterval(t); clearInterval(g) }
   }, [])
 
-  const handleLogin = () => {
-    setAuthModalTab("login")
-    setAuthModalOpen(true)
-  }
-
-  const handleSignup = () => {
-    setAuthModalTab("signup")
-    setAuthModalOpen(true)
-  }
-
+  const handleLogin = () => { setAuthModalTab("login"); setAuthModalOpen(true) }
+  const handleSignup = () => { setAuthModalTab("signup"); setAuthModalOpen(true) }
   const handleGuest = async () => {
     try {
       const response = await fetch("/api/auth/guest", { method: "POST" })
-      if (response.ok) {
-        window.location.href = "/menu"
-      }
-    } catch (error) {
-      console.error("[v0] Guest login error:", error)
-    }
+      if (response.ok) window.location.href = "/menu"
+    } catch (error) { console.error("Guest login error:", error) }
   }
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* Background Image with Overlay */}
+    <section className="relative min-h-screen w-full flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 z-0">
-        <img
-          src="/modern-cozy-cafe-interior-with-warm-lighting-coffe.jpg"
-          alt="Café background"
-          className="w-full h-full object-cover"
-        />
-        {/* UPDATED: Using a consistent black overlay for better text contrast */}
+        <img src="/modern-cozy-cafe-interior-with-warm-lighting-coffe.jpg" alt="Café background" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-black/60" />
       </div>
 
-      {/* Content */}
       <div className="relative z-10 container mx-auto px-4 text-center">
-        {/* Dynamic Greeting */}
         <div className="mb-6 animate-fade-in">
-          {/* UPDATED: Text is now white */}
           <p className="text-white/90 text-lg md:text-xl font-medium mb-2 drop-shadow-md">
-            {greeting}, Welcome to IntelliCafe!
+            {greeting}, {isAuthenticated && user ? user.name : "Welcome to IntelliCafe!"}
           </p>
-          <p className="text-white/80 text-sm md:text-base font-mono">
-            {currentTime}
-          </p>
+          <p className="text-white/80 text-sm md:text-base font-mono">{currentTime}</p>
         </div>
 
-        {/* Main Title */}
-        {/* UPDATED: Big, bold, white text with a shadow */}
-        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 animate-fade-in-up text-balance drop-shadow-xl">
-          Welcome to IntelliCafe
+        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 animate-fade-in-up drop-shadow-xl">
+          {isAuthenticated ? "Ready for Coffee?" : "Welcome to IntelliCafe"}
         </h1>
 
-        {/* Subtitle */}
-        {/* UPDATED: Lighter white text */}
-        <p className="text-lg md:text-xl lg:text-2xl text-white/90 mb-12 max-w-3xl mx-auto animate-fade-in-up text-pretty drop-shadow-md">
+        <p className="text-lg md:text-xl lg:text-2xl text-white/90 mb-12 max-w-3xl mx-auto animate-fade-in-up drop-shadow-md">
           An Interactive and Intelligent Web-based Café System
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up">
-          <Button size="lg" onClick={handleLogin}>
-            <LogIn className="w-5 h-5 mr-2" />
-            Login
-          </Button>
-
-          {/* UPDATED: Styled outline button to be white on dark background */}
-          <Button 
-            size="lg" 
-            variant="outline" 
-            onClick={handleSignup}
-            className="border-white text-white bg-transparent hover:bg-white hover:text-black transition-colors"
-          >
-            <UserPlus className="w-5 h-5 mr-2" />
-            Sign Up
-          </Button>
-
-          <Button size="lg" variant="secondary" onClick={handleGuest}>
-            <Users className="w-5 h-5 mr-2" />
-            Guest Mode
-          </Button>
+          {isAuthenticated ? (
+            <Link href="/menu">
+                <Button size="lg" className="h-14 px-8 text-lg gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:scale-105 transition-all">
+                    <Coffee className="w-6 h-6" />
+                    Order Now
+                    <ArrowRight className="w-5 h-5 ml-1" />
+                </Button>
+            </Link>
+          ) : (
+            <>
+                <Button size="lg" onClick={handleLogin}> <LogIn className="w-5 h-5 mr-2" /> Login </Button>
+                <Button size="lg" variant="outline" onClick={handleSignup} className="border-white text-white bg-transparent hover:bg-white hover:text-black"> <UserPlus className="w-5 h-5 mr-2" /> Sign Up </Button>
+                <Button size="lg" variant="secondary" onClick={handleGuest}> <Users className="w-5 h-5 mr-2" /> Guest Mode </Button>
+            </>
+          )}
         </div>
       </div>
-
-      <AuthModal
-        open={authModalOpen}
-        onOpenChange={setAuthModalOpen}
-        defaultTab={authModalTab}
-      />
+      <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} defaultTab={authModalTab} />
     </section>
   )
 }

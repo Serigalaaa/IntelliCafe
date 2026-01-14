@@ -18,8 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-// Added UploadIcon
-import { Edit, Trash, Plus, Loader2, ImageIcon, Package, UploadCloud } from "lucide-react" 
+import { Edit, Trash, Plus, Loader2, ImageIcon, Package } from "lucide-react" 
 import { useGlobalModal } from "@/components/providers/modal-provider"
 
 interface MenuItem {
@@ -40,11 +39,10 @@ export function AdminMenuManager() {
   const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  
-  // New state for upload loading
   const [isUploading, setIsUploading] = useState(false) 
 
-  const { showSuccess, showError } = useGlobalModal()
+  // 1. Destructure showConfirm
+  const { showSuccess, showError, showConfirm } = useGlobalModal()
   const [editingId, setEditingId] = useState<string | null>(null)
   
   const [formData, setFormData] = useState<Partial<MenuItem>>({
@@ -98,7 +96,6 @@ export function AdminMenuManager() {
     setIsDialogOpen(true)
   }
 
-  // --- NEW: Image Upload Handler ---
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -115,7 +112,6 @@ export function AdminMenuManager() {
       const data = await res.json()
 
       if (data.success) {
-        // Automatically set the image path in our form data
         setFormData((prev) => ({ ...prev, image: data.path }))
         showSuccess("Upload Complete", "Image uploaded successfully")
       } else {
@@ -157,8 +153,16 @@ export function AdminMenuManager() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this item?")) return
+  // 2. Updated Delete Handler
+  const handleDeleteClick = (id: string) => {
+    showConfirm(
+      "Delete Menu Item?",
+      "Are you sure you want to remove this item from the menu?",
+      () => performDelete(id)
+    )
+  }
+
+  const performDelete = async (id: string) => {
     try {
       const res = await fetch(`/api/menu/${id}`, { method: "DELETE" })
       if (res.ok) {
@@ -186,6 +190,7 @@ export function AdminMenuManager() {
               <DialogTitle>{editingId ? "Edit Item" : "Add New Item"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* (Same Form Inputs as before) */}
               <div>
                 <Label htmlFor="name">Name</Label>
                 <Input
@@ -248,18 +253,12 @@ export function AdminMenuManager() {
                 />
               </div>
 
-              {/* --- IMAGE UPLOAD SECTION --- */}
               <div>
                 <Label htmlFor="image">Item Image</Label>
                 <div className="flex gap-4 items-center mt-2">
-                  {/* Image Preview */}
                   {formData.image ? (
                     <div className="relative w-16 h-16 rounded-md overflow-hidden border">
-                      <img 
-                        src={formData.image} 
-                        alt="Preview" 
-                        className="w-full h-full object-cover" 
-                      />
+                      <img src={formData.image} alt="Preview" className="w-full h-full object-cover" />
                     </div>
                   ) : (
                     <div className="w-16 h-16 rounded-md border flex items-center justify-center bg-muted">
@@ -267,7 +266,6 @@ export function AdminMenuManager() {
                     </div>
                   )}
 
-                  {/* File Input */}
                   <div className="flex-1">
                     <Input
                       id="image"
@@ -317,7 +315,8 @@ export function AdminMenuManager() {
                 <Button size="sm" variant="outline" onClick={() => handleOpenEdit(item)}>
                   <Edit className="w-4 h-4" />
                 </Button>
-                <Button size="sm" variant="destructive" onClick={() => handleDelete(item._id)}>
+                {/* 3. Use new handler */}
+                <Button size="sm" variant="destructive" onClick={() => handleDeleteClick(item._id)}>
                   <Trash className="w-4 h-4" />
                 </Button>
               </div>
