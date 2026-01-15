@@ -40,15 +40,15 @@ export function Footer() {
             <ul className="space-y-3">
               <li className="flex items-start gap-2 text-sm">
                 <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span className="text-primary-foreground/80">University Campus, Building A, Room 101</span>
+                <span className="text-primary-foreground/80">Juwita Kopi, Sutera Square, Masjid, Taman Sutera, 43000 Kajang, Selangor</span>
               </li>
               <li className="flex items-center gap-2 text-sm">
                 <Phone className="w-4 h-4 flex-shrink-0" />
-                <span className="text-primary-foreground/80">+1 (555) 123-4567</span>
+                <span className="text-primary-foreground/80">+6019 877-8793</span>
               </li>
               <li className="flex items-center gap-2 text-sm">
                 <Mail className="w-4 h-4 flex-shrink-0" />
-                <span className="text-primary-foreground/80">info@intellicafe.com</span>
+                <span className="text-primary-foreground/80">syakirimran123@gmail.com</span>
               </li>
             </ul>
           </div>

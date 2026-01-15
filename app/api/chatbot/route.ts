@@ -19,8 +19,8 @@ export async function POST(request: NextRequest) {
          - **Favorites:** Juwita Signature Latte, Nasi Lemak Special, Hazelnut Croissant.
          - **Hours:** Mon-Sat 5pm-11pm (Closed Sundays).
          - **Location:** Juwita Kopi, Sutera Square, Masjid, Taman Sutera, 43000 Kajang, Selangor.
-         - **Owner:** Mr. Azman (Started 2023).
-         - **Contact:** +6012-345-6789 | hello@juwitakopi.com
+         - **Owner:** Miss Farhana (Started 2023).
+         - **Contact:** +6019-373-0446 | hello@juwitakopi.com
 
       2. GENERAL COFFEE KNOWLEDGE (Use this to answer general questions):
          - **Latte vs Cappuccino:** A Latte is milky and smooth (more steamed milk); a Cappuccino is frothy and stronger (more foam).
@@ -56,9 +56,9 @@ export async function POST(request: NextRequest) {
     } else if (lowerMessage.includes("favourite") || lowerMessage.includes("favorite") || lowerMessage.includes("recommend")) {
       response = "Our customer favorites are the Juwita Signature Latte and Nasi Lemak Special."
     } else if (lowerMessage.includes("owner") || lowerMessage.includes("about")) {
-      response = "Juwita Kopi is owned by Mr. Azman. We started in 2023 to serve the best coffee in Kajang."
+      response = "Juwita Kopi is owned by Miss Farhana. We started in 2023 to serve the best coffee in Kajang."
     } else if (lowerMessage.includes("contact") || lowerMessage.includes("call")) {
-      response = "You can contact us at +6012-345-6789."
+      response = "You can contact us at +6019-373-0446."
     } else if (lowerMessage.includes("latte") || lowerMessage.includes("cappuccino") || lowerMessage.includes("flat white")) {
       // Basic fallback for coffee knowledge
       response = "Great question! A Latte is milky, a Cappuccino is frothy, and a Flat White is strong and smooth. We serve all three!"
