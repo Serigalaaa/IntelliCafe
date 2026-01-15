@@ -51,8 +51,8 @@ export default function ChatbotPage() {
                             <div>
                                 <p className="font-medium text-foreground">Opening Hours</p>
                                 <p className="text-muted-foreground text-sm mt-1">
-                                    Mon - Fri: 8:00 AM - 10:00 PM<br/>
-                                    Sat - Sun: 9:00 AM - 11:00 PM
+                                    Mon - Fri: 5:00 PM - 11:00 PM<br/>
+                                    Sat - Sun: 5:00 PM - 11:00 PM
                                 </p>
                             </div>
                         </div>
@@ -64,7 +64,7 @@ export default function ChatbotPage() {
                             <div>
                                 <p className="font-medium text-foreground">Contact</p>
                                 <p className="text-muted-foreground text-sm mt-1">
-                                    +60 3-8733 1234
+                                    +6019-373 0446
                                 </p>
                             </div>
                         </div>
