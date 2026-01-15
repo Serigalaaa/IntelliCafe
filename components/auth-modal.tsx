@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useAuth } from "@/hooks/use-auth"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -9,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2 } from "lucide-react"
+import { Loader2, Phone } from "lucide-react" // Added Phone icon
 
 interface AuthModalProps {
   open: boolean
@@ -18,7 +17,7 @@ interface AuthModalProps {
 }
 
 export function AuthModal({ open, onOpenChange, defaultTab = "login" }: AuthModalProps) {
-  const { login, signup, loginAsGuest } = useAuth()
+  const { login, loginAsGuest } = useAuth()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -29,6 +28,7 @@ export function AuthModal({ open, onOpenChange, defaultTab = "login" }: AuthModa
   // Signup form
   const [signupName, setSignupName] = useState("")
   const [signupEmail, setSignupEmail] = useState("")
+  const [signupPhone, setSignupPhone] = useState("") // 1. Phone State
   const [signupPassword, setSignupPassword] = useState("")
 
   async function handleLogin(e: React.FormEvent) {
@@ -42,7 +42,8 @@ export function AuthModal({ open, onOpenChange, defaultTab = "login" }: AuthModa
       setError(result.error || "Login failed")
       setLoading(false)
     } else {
-      onOpenChange(false)
+      // Force refresh to update UI state
+      window.location.href = "/"
     }
   }
 
@@ -51,27 +52,43 @@ export function AuthModal({ open, onOpenChange, defaultTab = "login" }: AuthModa
     setError("")
     setLoading(true)
 
-    const result = await signup(signupEmail, signupPassword, signupName)
+    try {
+      // 2. Call API directly to include Phone Number
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: signupName,
+          email: signupEmail,
+          phone: signupPhone, // Send phone
+          password: signupPassword,
+        }),
+      })
 
-    if (!result.success) {
-      setError(result.error || "Signup failed")
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || "Signup failed")
+      }
+
+      // 3. Success - Refresh page to activate session
+      window.location.href = "/"
+      
+    } catch (err: any) {
+      setError(err.message)
       setLoading(false)
-    } else {
-      onOpenChange(false)
     }
   }
 
   async function handleGuestLogin() {
     setError("")
     setLoading(true)
-
     const result = await loginAsGuest()
-
     if (!result.success) {
       setError(result.error || "Guest login failed")
       setLoading(false)
     } else {
-      onOpenChange(false)
+      window.location.href = "/menu"
     }
   }
 
@@ -114,18 +131,12 @@ export function AuthModal({ open, onOpenChange, defaultTab = "login" }: AuthModa
                 />
               </div>
 
-              {error && <div className="text-sm text-destructive">{error}</div>}
+              {error && <div className="text-sm text-destructive font-medium bg-destructive/10 p-2 rounded">{error}</div>}
 
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Login
               </Button>
-
-              <div className="text-sm text-muted-foreground text-center">
-                Demo: admin@intellicafe.com / admin123
-                <br />
-                or customer@example.com / password123
-              </div>
             </form>
           </TabsContent>
 
@@ -153,6 +164,24 @@ export function AuthModal({ open, onOpenChange, defaultTab = "login" }: AuthModa
                   required
                 />
               </div>
+
+              {/* 4. New Phone Input */}
+              <div className="space-y-2">
+                <Label htmlFor="signup-phone">Phone Number</Label>
+                <div className="relative">
+                    <Phone className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                        id="signup-phone" 
+                        type="tel" 
+                        placeholder="012-3456789" 
+                        className="pl-9"
+                        value={signupPhone}
+                        onChange={(e) => setSignupPhone(e.target.value)}
+                        required 
+                    />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="signup-password">Password</Label>
                 <Input
@@ -165,11 +194,11 @@ export function AuthModal({ open, onOpenChange, defaultTab = "login" }: AuthModa
                 />
               </div>
 
-              {error && <div className="text-sm text-destructive">{error}</div>}
+              {error && <div className="text-sm text-destructive font-medium bg-destructive/10 p-2 rounded">{error}</div>}
 
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Sign Up
+                Create Account
               </Button>
             </form>
           </TabsContent>

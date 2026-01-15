@@ -15,19 +15,27 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { CartSidebar } from "@/components/cart-sidebar"
 import { ReceiptButton } from "@/components/receipt-button"
-import { useCartStore } from "@/lib/cart-store" // <--- Import Store
+import { useCartStore } from "@/lib/cart-store" 
 
 export function Navigation() {
   const [isOpen, setIsOpen] = useState(false)
   const { user, isAuthenticated, logout } = useAuth()
   
-  // Get the clear function
   const { clearOrderHistory } = useCartStore() 
 
-  const handleLogout = () => {
-    clearOrderHistory() // <--- Clear sensitive data first
-    logout()            // Then log out
-    setIsOpen(false)    // Close mobile menu if open
+  const handleLogout = async () => {
+    // 1. Clear local cart/history data
+    clearOrderHistory() 
+    
+    // 2. Perform the logout (await ensures cookie is cleared)
+    await logout()
+    
+    // 3. Close menu
+    setIsOpen(false)
+
+    // 4. Force a hard refresh to the home page
+    // This clears all state/cache instantly and resets the view to "Guest"
+    window.location.href = "/"
   }
 
   const navItems = [
@@ -48,6 +56,7 @@ export function Navigation() {
             <span className="font-semibold text-lg text-foreground">IntelliCafe</span>
           </Link>
 
+          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
             <div className="flex items-center gap-6 mr-4">
               {navItems.map((item) => (
@@ -82,7 +91,7 @@ export function Navigation() {
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout}> {/* Use new handler */}
+                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                       <LogOut className="w-4 h-4 mr-2" />
                       Logout
                     </DropdownMenuItem>
@@ -92,8 +101,8 @@ export function Navigation() {
             </div>
           </div>
 
+          {/* Mobile Menu Toggle */}
           <button onClick={() => setIsOpen(!isOpen)} className="flex md:hidden items-center gap-2 p-2 text-foreground" aria-label="Toggle menu">
-             {/* Show mini cart/receipt on mobile header too if you like */}
              <div className="flex md:hidden">
                 <ReceiptButton />
                 <CartSidebar />
@@ -107,6 +116,7 @@ export function Navigation() {
           </button>
         </div>
 
+        {/* Mobile Menu Content */}
         {isOpen && (
           <div className="md:hidden py-4 border-t border-border animate-in slide-in-from-top-5">
             {navItems.map((item) => (
@@ -124,7 +134,7 @@ export function Navigation() {
               <div className="mt-4 pt-4 border-t">
                 <div className="px-2 py-2 text-sm font-medium text-foreground/60">{user.name}</div>
                 <button
-                  onClick={handleLogout} // Use new handler
+                  onClick={handleLogout}
                   className="w-full text-left px-2 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 rounded-md transition-colors"
                 >
                   Logout

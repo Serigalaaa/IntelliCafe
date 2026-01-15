@@ -3,6 +3,8 @@ export interface User {
   email: string
   password: string
   name: string
+  // Add this line to match your DB Schema
+  phone: string 
   role: "user" | "admin"
   createdAt: Date
 }
