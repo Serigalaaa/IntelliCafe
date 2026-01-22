@@ -1,158 +1,270 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { CheckCircle2, XCircle, Trash2 } from "lucide-react"
-// 1. Import Hook
-import { useGlobalModal } from "@/components/providers/modal-provider"
-
-interface Order {
-  _id: string
-  orderNumber: string
-  totalAmount: number
-  status: "pending" | "done" | "cancelled"
-  items: any[]
-  createdAt: string
-}
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Loader2,
+  Trash2,
+  User,
+  Clock,
+  ShoppingBag,
+  TicketPercent,
+} from "lucide-react";
+import { useGlobalModal } from "@/components/providers/modal-provider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function AdminOrderManager() {
-  const [orders, setOrders] = useState<Order[]>([])
-  const [loading, setLoading] = useState(true)
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pendingUpdate, setPendingUpdate] = useState<{
+    id: string;
+    status: string;
+  } | null>(null);
 
-  // 2. Use Hook
-  const { showConfirm, showSuccess, showError } = useGlobalModal()
-
-  useEffect(() => {
-    fetchOrders()
-    const interval = setInterval(fetchOrders, 10000)
-    return () => clearInterval(interval)
-  }, [])
+  const { showConfirm, showSuccess, showError } = useGlobalModal();
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch("/api/orders")
-      const data = await res.json()
-      setOrders(data)
+      const res = await fetch("/api/orders");
+      const data = await res.json();
+      setOrders(data);
     } catch (error) {
-      console.error(error)
+      console.error("Failed to fetch orders:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const updateStatus = async (id: string, newStatus: string) => {
+  useEffect(() => {
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const confirmStatusUpdate = async () => {
+    if (!pendingUpdate) return;
+    const { id, status } = pendingUpdate;
+
     try {
       await fetch("/api/orders", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status: newStatus }),
-      })
-      setOrders(prev => prev.map(o => o._id === id ? { ...o, status: newStatus as any } : o))
-    } catch (error) {
-      console.error("Failed to update status")
-    }
-  }
+        body: JSON.stringify({ id, status }),
+      });
 
-  // 3. Updated Delete Handler
+      setOrders(orders.map((o) => (o._id === id ? { ...o, status } : o)));
+      showSuccess("Status Updated", `Order marked as ${status.toUpperCase()}`);
+    } catch (error) {
+      showError("Update Failed", "Could not update order status");
+    } finally {
+      setPendingUpdate(null);
+    }
+  };
+
+  const handleStatusChange = (id: string, newStatus: string) => {
+    setPendingUpdate({ id, status: newStatus });
+  };
+
   const handleDeleteClick = (id: string) => {
     showConfirm(
-      "Delete Order Record?",
-      "Are you sure you want to permanently delete this order history? This cannot be undone.",
-      () => performDelete(id)
-    )
-  }
+      "Delete Order?",
+      "Are you sure you want to delete this order?",
+      () => performDelete(id),
+    );
+  };
 
   const performDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/orders?id=${id}`, { method: "DELETE" })
-      if (res.ok) {
-        setOrders(prev => prev.filter(o => o._id !== id))
-        showSuccess("Order Deleted", "The record has been removed.")
-      } else {
-        showError("Error", "Failed to delete order.")
-      }
+      const res = await fetch(`/api/orders?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete");
+      setOrders((prev) => prev.filter((o) => o._id !== id));
+      showSuccess("Order Deleted", "The order has been removed successfully.");
     } catch (error) {
-      showError("System Error", "Could not connect to server.")
+      showError("Delete Failed", "Could not remove the order.");
     }
-  }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "pending": 
-        return "bg-yellow-100 text-yellow-800 hover:bg-yellow-100 border-yellow-200"
-      case "done": 
-        return "bg-green-100 text-green-800 hover:bg-green-100 border-green-200"
-      case "cancelled": 
-        return "bg-red-100 text-red-800 hover:bg-red-100 border-red-200"
-      default: 
-        return "bg-gray-100 text-gray-800"
+      case "pending":
+        return "bg-yellow-500 hover:bg-yellow-600 text-white";
+      case "preparing":
+        return "bg-blue-500 hover:bg-blue-600 text-white";
+      case "ready":
+        return "bg-indigo-500 hover:bg-indigo-600 text-white";
+      case "completed":
+        return "bg-green-600 hover:bg-green-700 text-white";
+      case "cancelled":
+        return "bg-slate-500 hover:bg-slate-600 text-white";
+      default:
+        return "bg-slate-500 text-white";
     }
-  }
+  };
+
+  if (loading)
+    return (
+      <div className="flex justify-center p-8">
+        <Loader2 className="animate-spin" />
+      </div>
+    );
 
   return (
-    <Card className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Incoming Orders</h2>
-        <Button variant="outline" size="sm" onClick={fetchOrders}>Refresh</Button>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold">Incoming Orders</h2>
+        <Button variant="outline" size="sm" onClick={fetchOrders}>
+          Refresh List
+        </Button>
       </div>
 
-      <div className="space-y-4">
-        {loading ? <p>Loading orders...</p> : orders.length === 0 ? <p>No orders yet.</p> : (
-          orders.map((order) => (
-            <div key={order._id} className="border rounded-lg p-4 flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">
-              
-              <div className="space-y-1">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono font-bold text-lg">{order.orderNumber}</span>
-                  <Badge className={`border ${getStatusColor(order.status)}`}>
-                    {order.status.toUpperCase()}
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {new Date(order.createdAt).toLocaleString()} • {order.items.length} Items
-                </p>
-                <div className="text-sm text-muted-foreground">
-                   {order.items.map(i => `${i.quantity}x ${i.name}`).join(", ")}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-                <span className="font-bold text-xl">RM{order.totalAmount.toFixed(2)}</span>
-                
-                <div className="flex items-center gap-2">
-                  {order.status === "pending" && (
-                    <>
-                      <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => updateStatus(order._id, "done")}>
-                         <CheckCircle2 className="w-4 h-4 mr-1" /> Paid
-                      </Button>
-                      <Button size="sm" variant="outline" className="text-destructive border-destructive hover:bg-destructive/10" onClick={() => updateStatus(order._id, "cancelled")}>
-                         <XCircle className="w-4 h-4 mr-1" /> Cancel
-                      </Button>
-                    </>
-                  )}
-                  {order.status === "done" && (
-                      <span className="text-green-600 flex items-center text-sm font-medium mr-2">
-                          <CheckCircle2 className="w-4 h-4 mr-1" /> Completed
+      {orders.length === 0 ? (
+        <div className="text-center p-12 border rounded-lg bg-muted/20 text-muted-foreground">
+          <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-20" />
+          <p>No active orders</p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {orders.map((order) => (
+            <Card key={order._id} className="overflow-hidden">
+              <CardContent className="p-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  {/* LEFT: Order Info */}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-3">
+                      <span className="font-bold text-lg">
+                        {order.orderNumber}
                       </span>
-                  )}
-                  {order.status === "cancelled" && (
-                      <span className="text-destructive flex items-center text-sm font-medium mr-2">
-                          <XCircle className="w-4 h-4 mr-1" /> Cancelled
-                      </span>
-                  )}
+                      <Badge className={getStatusColor(order.status)}>
+                        {order.status.toUpperCase()}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded w-fit">
+                      <User className="w-4 h-4" />
+                      <span>{order.userName || "Guest"}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="w-3 h-3" />
+                      {new Date(order.createdAt).toLocaleString()}
+                    </div>
+                  </div>
 
-                  {/* 4. Use new handler */}
-                  <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(order._id)} title="Delete Record">
-                    <Trash2 className="w-4 h-4 text-muted-foreground hover:text-red-600 transition-colors" />
-                  </Button>
+                  {/* MIDDLE: Items & Pricing */}
+                  <div className="flex-1 border-l pl-4 border-gray-100 min-h-[60px]">
+                    <div className="space-y-2 mb-3">
+                      {order.items.map((item: any, idx: number) => (
+                        // NEW: Flex container to split Name and Price
+                        <div
+                          key={idx}
+                          className="flex justify-between items-start text-sm"
+                        >
+                          <span>
+                            <span className="font-bold">{item.quantity}x</span>{" "}
+                            {item.name}
+                          </span>
+                          <span className="text-muted-foreground font-mono">
+                            RM{(item.price * item.quantity).toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Total Section with Voucher Badge */}
+                    <div className="space-y-1 border-t pt-2">
+                      <div className="flex justify-between items-center">
+                        {order.voucherCode ? (
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100 w-fit">
+                            <TicketPercent className="w-3 h-3" />
+                            <span>
+                              {order.voucherCode} (-RM
+                              {order.discount?.toFixed(2)})
+                            </span>
+                          </div>
+                        ) : (
+                          <span></span>
+                        )}
+
+                        <div className="font-bold text-sm">
+                          Total: RM{order.totalAmount?.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* RIGHT: Actions */}
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={order.status}
+                      onValueChange={(val) =>
+                        handleStatusChange(order._id, val)
+                      }
+                    >
+                      <SelectTrigger className="w-[130px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="preparing">Preparing</SelectItem>
+                        <SelectItem value="ready">Ready</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => handleDeleteClick(order._id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </Card>
-  )
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <AlertDialog
+        open={!!pendingUpdate}
+        onOpenChange={() => setPendingUpdate(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update Status?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Change status to{" "}
+              <span className="font-bold text-foreground">
+                "{pendingUpdate?.status.toUpperCase()}"
+              </span>
+              ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmStatusUpdate}>
+              Confirm Change
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
 }

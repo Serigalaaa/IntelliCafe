@@ -1,106 +1,117 @@
-// import { type NextRequest, NextResponse } from "next/server"
-// import clientPromise from "@/lib/mongodb"
-// import { ObjectId } from "mongodb"
-
-// export async function POST(request: NextRequest) {
-//   try {
-//     const client = await clientPromise
-//     if (!client) throw new Error("Database connection failed")
-//     const db = client.db("intellicafe")
-
-//     const { items } = await request.json()
-
-//     if (!items || items.length === 0) {
-//       return NextResponse.json({ error: "Cart is empty" }, { status: 400 })
-//     }
-
-//     // 1. Verify Stock for ALL items before processing
-//     for (const item of items) {
-//       const dbItem = await db.collection("menu_items").findOne({ _id: new ObjectId(item._id) })
-      
-//       if (!dbItem) {
-//         return NextResponse.json({ error: `Item "${item.name}" no longer exists.` }, { status: 404 })
-//       }
-      
-//       if (dbItem.stock < item.quantity) {
-//         return NextResponse.json({ 
-//             error: `Not enough stock for "${item.name}". Only ${dbItem.stock} left.` 
-//         }, { status: 400 })
-//       }
-//     }
-
-//     // 2. Create the Order Record
-//     const order = {
-//       items,
-//       totalAmount: items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0),
-//       status: "completed", // Simplified for this demo
-//       createdAt: new Date(),
-//     }
-
-//     const orderResult = await db.collection("orders").insertOne(order)
-
-//     // 3. Deduct Stock from Inventory
-//     // Note: In a high-traffic production app, you would use a Transaction here.
-//     for (const item of items) {
-//         await db.collection("menu_items").updateOne(
-//             { _id: new ObjectId(item._id) },
-//             { $inc: { stock: -item.quantity } } // Decrement stock
-//         )
-//     }
-
-//     return NextResponse.json({ success: true, orderId: orderResult.insertedId })
-
-//   } catch (error) {
-//     console.error("Checkout Error:", error)
-//     return NextResponse.json({ error: "Checkout failed. Please try again." }, { status: 500 })
-//   }
-// }
-
 import { type NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/mongodb"
 import { ObjectId } from "mongodb"
+import { cookies } from "next/headers"
 
 export async function POST(request: NextRequest) {
   try {
     const client = await clientPromise
     if (!client) throw new Error("Database connection failed")
     const db = client.db("intellicafe")
-    const { items } = await request.json()
+
+    // --- RECEIVE VOUCHER CODE ---
+    const { items, voucherCode } = await request.json()
 
     if (!items || items.length === 0) {
       return NextResponse.json({ error: "Cart is empty" }, { status: 400 })
     }
 
-    // 1. Calculate Total
-    const totalAmount = items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0)
+    // 1. Identify User
+    const cookieStore = await cookies()
+    const sessionCookie = cookieStore.get("session")
+    const guestCookie = cookieStore.get("guest_session_id")
 
-    // 2. Create Order Object
-    const order = {
-      items,
-      totalAmount,
-      status: "pending", // Default status
-      createdAt: new Date(),
-      // Generate a short "Order Number" for the receipt (e.g., ORD-1234)
-      orderNumber: `JWT-${Math.floor(1000 + Math.random() * 9000)}` 
+    let userId = null
+    let userName = "Guest"
+    let isNewGuest = false
+    let guestIdToSet = ""
+
+    if (sessionCookie) {
+      const session = JSON.parse(sessionCookie.value)
+      userId = session.user.id
+      userName = session.user.name || "User"
+    } else if (guestCookie) {
+      userId = guestCookie.value
+      userName = "Guest"
+    } else {
+      userId = `guest_${crypto.randomUUID()}`
+      userName = "Guest"
+      isNewGuest = true
+      guestIdToSet = userId
     }
 
-    // 3. Save to Database
+    // 2. Calculate Base Total
+    let totalAmount = items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0)
+    let discountApplied = 0
+
+    // 3. --- VERIFY VOUCHER AGAIN (Security) ---
+    if (voucherCode) {
+      const voucher = await db.collection("vouchers").findOne({ code: voucherCode })
+
+      if (voucher && voucher.isActive) {
+        // Check Daily Limit
+        if (voucher.limitType === "daily") {
+          const startOfDay = new Date();
+          startOfDay.setHours(0, 0, 0, 0);
+          const existing = await db.collection("orders").findOne({
+            userId,
+            voucherCode,
+            createdAt: { $gte: startOfDay }
+          })
+
+          // Apply if not used today
+          if (!existing) {
+            if (voucher.type === "percentage") {
+              discountApplied = (totalAmount * voucher.value) / 100
+            } else {
+              discountApplied = voucher.value
+            }
+          }
+        } else {
+          // Unlimited or One-Time logic here
+          if (voucher.type === "percentage") {
+            discountApplied = (totalAmount * voucher.value) / 100
+          } else {
+            discountApplied = voucher.value
+          }
+        }
+      }
+    }
+
+    const finalTotal = Math.max(0, totalAmount - discountApplied)
+
+    // 4. Create Order
+    const order = {
+      userId,
+      userName,
+      items,
+      subTotal: totalAmount,
+      discount: discountApplied,
+      voucherCode: discountApplied > 0 ? voucherCode : null,
+      totalAmount: finalTotal,
+      status: "pending",
+      createdAt: new Date(),
+      orderNumber: `JWT-${Math.floor(1000 + Math.random() * 9000)}`
+    }
+
     const result = await db.collection("orders").insertOne(order)
 
-    // 4. Deduct Stock (Optional: keep your stock logic here if you used it previously)
-    for (const item of items) {
-       await db.collection("menu_items").updateOne(
-           { _id: new ObjectId(item._id) },
-           { $inc: { stock: -item.quantity } }
-       )
+    const response = NextResponse.json({
+      success: true,
+      orderId: result.insertedId,
+      orderNumber: order.orderNumber
+    })
+
+    if (isNewGuest) {
+      response.cookies.set("guest_session_id", guestIdToSet, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 30
+      })
     }
 
-    // 5. Return the Order Number for the Receipt
-    return NextResponse.json({ 
-      success: true, 
-      orderId: result.insertedId,
-      orderNumber: order.orderNumber 
-    })
+    return response
 
   } catch (error) {
     return NextResponse.json({ error: "Checkout failed" }, { status: 500 })

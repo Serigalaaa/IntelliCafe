@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ShoppingCart, MessageSquare, Users, DollarSign, Download, TrendingUp } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ShoppingCart, MessageSquare, Users, DollarSign, Download, TrendingUp, RefreshCw } from "lucide-react"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts"
 
 export function AdminStats() {
@@ -15,37 +16,49 @@ export function AdminStats() {
   })
   const [graphData, setGraphData] = useState([])
   const [loading, setLoading] = useState(true)
+  const [chartRange, setChartRange] = useState("weekly") // State for dropdown
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // 1. Fetch Summary Stats
-        const statsRes = await fetch("/api/admin/stats")
-        const statsData = await statsRes.json()
-        setStats(statsData)
-
-        // 2. Fetch Graph Data
-        const graphRes = await fetch("/api/admin/analytics")
-        const graphData = await graphRes.json()
-        setGraphData(graphData)
-      } catch (error) {
-        console.error("Failed to fetch dashboard data:", error)
-      } finally {
-        setLoading(false)
-      }
+  // Fetch Stats (Summary Cards)
+  const fetchStats = async () => {
+    try {
+      const statsRes = await fetch("/api/admin/stats")
+      const statsData = await statsRes.json()
+      setStats(statsData)
+    } catch (error) {
+      console.error("Failed to fetch stats:", error)
     }
+  }
 
-    fetchData()
-  }, [])
+  // Fetch Graph Data based on Range
+  const fetchGraphData = async () => {
+    try {
+      // Pass the selected range to the API
+      const graphRes = await fetch(`/api/admin/analytics?range=${chartRange}`)
+      const data = await graphRes.json()
+      setGraphData(data)
+    } catch (error) {
+      console.error("Failed to fetch graph:", error)
+    }
+  }
+
+  // Initial Load & When Range Changes
+  useEffect(() => {
+    setLoading(true)
+    Promise.all([fetchStats(), fetchGraphData()]).finally(() => setLoading(false))
+  }, [chartRange]) // Re-run when chartRange changes
+
+  // Helper to refresh manually if needed
+  const handleRefresh = () => {
+    setLoading(true)
+    Promise.all([fetchStats(), fetchGraphData()]).finally(() => setLoading(false))
+  }
 
   // --- CSV REPORT GENERATION ---
   const handleDownloadReport = async () => {
     try {
-      // Fetch all orders for the report
       const res = await fetch("/api/orders")
       const orders = await res.json()
 
-      // Create CSV content
       const headers = ["Order Number,Date,Status,Total Amount (RM),Items\n"]
       const rows = orders.map((order: any) => {
         const date = new Date(order.createdAt).toLocaleDateString()
@@ -54,8 +67,6 @@ export function AdminStats() {
       })
 
       const csvContent = headers.concat(rows).join("\n")
-      
-      // Trigger Download
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
       const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
@@ -71,7 +82,7 @@ export function AdminStats() {
 
   const statCards = [
     { title: "Total Orders", value: stats.totalOrders, icon: ShoppingCart, description: "All time orders" },
-    { title: "Total Revenue", value: `RM${stats.totalRevenue.toFixed(2)}`, icon: DollarSign, description: "From completed orders" },
+    { title: "Total Revenue", value: `RM${stats.totalRevenue.toFixed(2)}`, icon: DollarSign, description: "Paid orders only" },
     { title: "Feedback", value: stats.totalFeedback, icon: MessageSquare, description: "Customer reviews" },
     { title: "Users", value: stats.totalUsers, icon: Users, description: "Registered accounts" },
   ]
@@ -100,19 +111,38 @@ export function AdminStats() {
       {/* 2. MAIN CONTENT GRID */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         
-        {/* REVENUE CHART (Takes up 4 columns) */}
+        {/* REVENUE CHART */}
         <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-primary" /> 
-                Revenue Overview
-            </CardTitle>
-            <CardDescription>Daily revenue for the past 7 days</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+                <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-primary" /> 
+                    Revenue Analytics
+                </CardTitle>
+                <CardDescription>
+                    Revenue from completed orders
+                </CardDescription>
+            </div>
+            
+            {/* TIME RANGE SELECTOR */}
+            <Select value={chartRange} onValueChange={setChartRange}>
+                <SelectTrigger className="w-[120px]">
+                    <SelectValue placeholder="Select range" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="weekly">Last 7 Days</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="yearly">Yearly</SelectItem>
+                </SelectContent>
+            </Select>
           </CardHeader>
+
           <CardContent className="pl-2">
             <div className="h-[300px] w-full">
               {loading ? (
-                <div className="h-full flex items-center justify-center text-muted-foreground">Loading chart...</div>
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                    <RefreshCw className="w-6 h-6 animate-spin mr-2" /> Loading...
+                </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={graphData}>
@@ -134,8 +164,15 @@ export function AdminStats() {
                     <Tooltip 
                         cursor={{ fill: 'transparent' }}
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                        formatter={(value: number) => [`RM${value.toFixed(2)}`, "Revenue"]}
                     />
-                    <Bar dataKey="total" fill="currentColor" radius={[4, 4, 0, 0]} className="fill-primary" barSize={40} />
+                    <Bar 
+                        dataKey="total" 
+                        fill="currentColor" 
+                        radius={[4, 4, 0, 0]} 
+                        className="fill-primary" 
+                        barSize={40} 
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -143,7 +180,7 @@ export function AdminStats() {
           </CardContent>
         </Card>
 
-        {/* ACTIONS CARD (Takes up 3 columns) */}
+        {/* ACTIONS CARD */}
         <Card className="col-span-3">
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
@@ -161,15 +198,19 @@ export function AdminStats() {
             </div>
             
             <div className="bg-muted/50 p-4 rounded-lg">
-                <p className="font-medium mb-2">System Health</p>
+                <div className="flex justify-between items-center mb-2">
+                    <p className="font-medium">System Status</p>
+                    <Button variant="ghost" size="sm" onClick={handleRefresh} title="Refresh Data">
+                        <RefreshCw className="w-4 h-4" />
+                    </Button>
+                </div>
                 <div className="flex items-center gap-2 text-sm text-green-600">
                     <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse" />
-                    Database Connected
+                    Live Database Connection
                 </div>
-                <div className="flex items-center gap-2 text-sm text-green-600 mt-1">
-                    <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse" />
-                    API Operational
-                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                    Charts update automatically when orders are marked as "Done".
+                </p>
             </div>
           </CardContent>
         </Card>

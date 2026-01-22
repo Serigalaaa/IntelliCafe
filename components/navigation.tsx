@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { Coffee, LogOut, UserIcon } from "lucide-react"
-import { useState } from "react"
-import { useAuth } from "@/hooks/use-auth"
-import { Button } from "@/components/ui/button"
+import Link from "next/link";
+import { Coffee, LogOut, UserIcon } from "lucide-react";
+import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,31 +12,23 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { CartSidebar } from "@/components/cart-sidebar"
-import { ReceiptButton } from "@/components/receipt-button"
-import { useCartStore } from "@/lib/cart-store" 
+} from "@/components/ui/dropdown-menu";
+import { CartSidebar } from "@/components/cart-sidebar";
+import { ReceiptButton } from "@/components/receipt-button";
+import { useCartStore } from "@/lib/cart-store";
 
 export function Navigation() {
-  const [isOpen, setIsOpen] = useState(false)
-  const { user, isAuthenticated, logout } = useAuth()
-  
-  const { clearOrderHistory } = useCartStore() 
+  const [isOpen, setIsOpen] = useState(false);
+  const { user, isAuthenticated, logout } = useAuth();
+
+  const { clearOrderHistory } = useCartStore();
 
   const handleLogout = async () => {
-    // 1. Clear local cart/history data
-    clearOrderHistory() 
-    
-    // 2. Perform the logout (await ensures cookie is cleared)
-    await logout()
-    
-    // 3. Close menu
-    setIsOpen(false)
-
-    // 4. Force a hard refresh to the home page
-    // This clears all state/cache instantly and resets the view to "Guest"
-    window.location.href = "/"
-  }
+    clearOrderHistory();
+    await logout();
+    setIsOpen(false);
+    window.location.href = "/";
+  };
 
   const navItems = [
     { name: "Home", href: "/" },
@@ -45,7 +37,7 @@ export function Navigation() {
     { name: "Game", href: "/game" },
     { name: "Chatbot", href: "/chatbot" },
     ...(user?.role === "admin" ? [{ name: "Admin", href: "/admin" }] : []),
-  ]
+  ];
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
@@ -53,7 +45,9 @@ export function Navigation() {
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2 group">
             <Coffee className="w-6 h-6 text-primary transition-transform group-hover:rotate-12" />
-            <span className="font-semibold text-lg text-foreground">IntelliCafe</span>
+            <span className="font-semibold text-lg text-foreground">
+              IntelliCafe
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -87,11 +81,16 @@ export function Navigation() {
                     <DropdownMenuLabel>
                       <div className="flex flex-col">
                         <span>{user.name}</span>
-                        <span className="text-xs text-muted-foreground font-normal">{user.email}</span>
+                        <span className="text-xs text-muted-foreground font-normal">
+                          {user.email}
+                        </span>
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                    <DropdownMenuItem
+                      onClick={handleLogout}
+                      className="cursor-pointer"
+                    >
                       <LogOut className="w-4 h-4 mr-2" />
                       Logout
                     </DropdownMenuItem>
@@ -101,19 +100,32 @@ export function Navigation() {
             </div>
           </div>
 
-          {/* Mobile Menu Toggle */}
-          <button onClick={() => setIsOpen(!isOpen)} className="flex md:hidden items-center gap-2 p-2 text-foreground" aria-label="Toggle menu">
-             <div className="flex md:hidden">
-                <ReceiptButton />
-                <CartSidebar />
-             </div>
-             
-             <div className="w-6 h-5 flex flex-col justify-between ml-2">
-              <span className={`w-full h-0.5 bg-current transition-all ${isOpen ? "rotate-45 translate-y-2" : ""}`} />
-              <span className={`w-full h-0.5 bg-current transition-all ${isOpen ? "opacity-0" : ""}`} />
-              <span className={`w-full h-0.5 bg-current transition-all ${isOpen ? "-rotate-45 -translate-y-2" : ""}`} />
-            </div>
-          </button>
+          {/* --- FIX START: Separate buttons for Mobile --- */}
+          <div className="flex md:hidden items-center gap-2">
+            {/* 1. Receipt and Cart are independent siblings now */}
+            <ReceiptButton />
+            <CartSidebar />
+
+            {/* 2. Hamburger Menu Button is its own independent button */}
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="p-2 text-foreground ml-1"
+              aria-label="Toggle menu"
+            >
+              <div className="w-6 h-5 flex flex-col justify-between">
+                <span
+                  className={`w-full h-0.5 bg-current transition-all ${isOpen ? "rotate-45 translate-y-2" : ""}`}
+                />
+                <span
+                  className={`w-full h-0.5 bg-current transition-all ${isOpen ? "opacity-0" : ""}`}
+                />
+                <span
+                  className={`w-full h-0.5 bg-current transition-all ${isOpen ? "-rotate-45 -translate-y-2" : ""}`}
+                />
+              </div>
+            </button>
+          </div>
+          {/* --- FIX END --- */}
         </div>
 
         {/* Mobile Menu Content */}
@@ -132,7 +144,9 @@ export function Navigation() {
 
             {isAuthenticated && user && (
               <div className="mt-4 pt-4 border-t">
-                <div className="px-2 py-2 text-sm font-medium text-foreground/60">{user.name}</div>
+                <div className="px-2 py-2 text-sm font-medium text-foreground/60">
+                  {user.name}
+                </div>
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-2 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 rounded-md transition-colors"
@@ -145,5 +159,5 @@ export function Navigation() {
         )}
       </div>
     </nav>
-  )
+  );
 }

@@ -1,150 +1,254 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Search, CheckCircle2, XCircle, Ticket, Loader2 } from "lucide-react"
-import { useGlobalModal } from "@/components/providers/modal-provider"
-
-interface Voucher {
-  _id: string
-  code: string
-  userName: string
-  game: string
-  status: "active" | "redeemed"
-  createdAt: string
-  redeemedAt?: string
-}
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Trash2, Ticket, Plus, Loader2 } from "lucide-react";
+import { useGlobalModal } from "@/components/providers/modal-provider";
 
 export function AdminVoucherManager() {
-  const [vouchers, setVouchers] = useState<Voucher[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  
-  // 1. Destructure showConfirm
-  const { showSuccess, showError, showConfirm } = useGlobalModal()
+  const [vouchers, setVouchers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const { showSuccess, showError, showConfirm } = useGlobalModal();
 
-  useEffect(() => {
-    fetchVouchers()
-  }, [])
+  // Form State
+  const [formData, setFormData] = useState({
+    code: "",
+    type: "percentage", // 'percentage' | 'fixed'
+    value: "",
+    limitType: "daily", // 'daily' | 'unlimited'
+    description: "",
+  });
 
   const fetchVouchers = async () => {
-    setIsLoading(true)
     try {
-      const res = await fetch("/api/vouchers")
-      const data = await res.json()
-      setVouchers(data)
-    } catch (error) {
-      console.error(error)
+      const res = await fetch("/api/vouchers");
+      const data = await res.json();
+      setVouchers(data);
+    } catch (e) {
+      console.error(e);
     } finally {
-      setIsLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // 2. Updated Redeem Handler
-  const handleRedeemClick = (id: string) => {
-    showConfirm(
-      "Redeem Voucher?",
-      "Are you sure you want to mark this voucher as used? This action cannot be reversed.",
-      () => performRedeem(id)
-    )
-  }
+  useEffect(() => {
+    fetchVouchers();
+  }, []);
 
-  const performRedeem = async (id: string) => {
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCreating(true);
     try {
       const res = await fetch("/api/vouchers", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      })
-
+        method: "POST",
+        body: JSON.stringify(formData),
+      });
       if (res.ok) {
-        showSuccess("Voucher Redeemed", "Customer has received their discount.")
-        fetchVouchers() 
+        showSuccess("Voucher Created", `${formData.code} is now active.`);
+        setFormData({
+          code: "",
+          type: "percentage",
+          value: "",
+          limitType: "daily",
+          description: "",
+        });
+        fetchVouchers();
+      } else {
+        const err = await res.json();
+        showError("Error", err.error);
       }
-    } catch (error) {
-      showError("Error", "Could not redeem voucher.")
+    } catch (e) {
+      showError("Error", "Failed to create voucher");
+    } finally {
+      setIsCreating(false);
     }
-  }
+  };
 
-  const filteredVouchers = vouchers.filter(v => 
-    v.code.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    v.userName.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const handleDelete = (id: string) => {
+    showConfirm(
+      "Delete Voucher?",
+      "Users will no longer be able to use this code.",
+      async () => {
+        await fetch(`/api/vouchers?id=${id}`, { method: "DELETE" });
+        fetchVouchers();
+        showSuccess("Deleted", "Voucher removed.");
+      },
+    );
+  };
 
   return (
-    <Card className="p-6">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <div>
-           <h2 className="text-2xl font-bold flex items-center gap-2">
-             <Ticket className="w-6 h-6 text-primary" /> Voucher Validation
-           </h2>
-           <p className="text-sm text-muted-foreground">Verify and redeem game rewards</p>
-        </div>
-        
-        <div className="relative w-full md:w-64">
-           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-           <Input 
-             placeholder="Search Code or User..." 
-             className="pl-8"
-             value={searchTerm}
-             onChange={(e) => setSearchTerm(e.target.value)}
-           />
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        {isLoading ? (
-             <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>
-        ) : filteredVouchers.length === 0 ? (
-             <p className="text-center text-muted-foreground py-8">No vouchers found.</p>
-        ) : (
-          filteredVouchers.map((voucher) => (
-            <div key={voucher._id} className="border rounded-lg p-4 flex flex-col md:flex-row justify-between items-center gap-4 hover:bg-muted/30 transition-all">
-              
-              <div className="flex items-center gap-4 w-full">
-                <div className={`p-3 rounded-full ${voucher.status === 'active' ? 'bg-green-100' : 'bg-gray-100'}`}>
-                    <Ticket className={`w-6 h-6 ${voucher.status === 'active' ? 'text-green-600' : 'text-gray-400'}`} />
-                </div>
-                
-                <div>
-                   <h4 className="font-mono text-xl font-bold tracking-wider">{voucher.code}</h4>
-                   <div className="text-sm text-muted-foreground flex gap-2">
-                      <span>{voucher.userName}</span>
-                      <span>•</span>
-                      <span className="capitalize">{voucher.game} Game</span>
-                   </div>
-                   <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(voucher.createdAt).toLocaleDateString()}
-                   </p>
-                </div>
+    <div className="grid gap-6 md:grid-cols-2">
+      {/* 1. CREATE FORM */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Plus className="w-5 h-5" /> Create Voucher
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Voucher Code</Label>
+                <Input
+                  placeholder="e.g. DAILY10"
+                  value={formData.code}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      code: e.target.value.toUpperCase(),
+                    })
+                  }
+                  required
+                />
               </div>
-
-              <div className="flex items-center gap-4 w-full md:w-auto justify-end">
-                 {voucher.status === "active" ? (
-                    <>
-                        <Badge className="bg-green-100 text-green-800 border-green-200 hover:bg-green-100">Valid</Badge>
-                        {/* 3. Use new handler */}
-                        <Button size="sm" onClick={() => handleRedeemClick(voucher._id)}>
-                            Redeem Now
-                        </Button>
-                    </>
-                 ) : (
-                    <>
-                        <Badge variant="outline" className="text-muted-foreground">Redeemed</Badge>
-                        <span className="text-xs text-muted-foreground">
-                            {voucher.redeemedAt && new Date(voucher.redeemedAt).toLocaleDateString()}
-                        </span>
-                    </>
-                 )}
+              <div className="space-y-2">
+                <Label>Limit Type</Label>
+                <Select
+                  value={formData.limitType}
+                  onValueChange={(v) =>
+                    setFormData({ ...formData, limitType: v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Once Per Day</SelectItem>
+                    <SelectItem value="unlimited">Unlimited</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-
             </div>
-          ))
-        )}
-      </div>
-    </Card>
-  )
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Discount Type</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(v) => setFormData({ ...formData, type: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">Percentage (%)</SelectItem>
+                    <SelectItem value="fixed">Fixed Amount (RM)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Value</Label>
+                <Input
+                  type="number"
+                  placeholder={formData.type === "percentage" ? "10" : "5.00"}
+                  value={formData.value}
+                  onChange={(e) =>
+                    setFormData({ ...formData, value: e.target.value })
+                  }
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Input
+                placeholder="e.g. 10% off for loyal customers"
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+              />
+            </div>
+
+            <Button type="submit" className="w-full" disabled={isCreating}>
+              {isCreating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Create Voucher"
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* 2. VOUCHER LIST */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Ticket className="w-5 h-5" /> Active Vouchers
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <Loader2 className="mx-auto animate-spin" />
+          ) : vouchers.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">
+              No vouchers created yet.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Discount</TableHead>
+                  <TableHead>Limit</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {vouchers.map((v) => (
+                  <TableRow key={v._id}>
+                    <TableCell className="font-bold font-mono">
+                      {v.code}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {v.type === "percentage"
+                          ? `${v.value}%`
+                          : `RM${v.value}`}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="capitalize text-xs">
+                      {v.limitType}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(v._id)}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

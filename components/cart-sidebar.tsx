@@ -1,132 +1,363 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { Button } from "@/components/ui/button"
-import { ShoppingCart, Plus, Minus, Trash2, Loader2 } from "lucide-react"
-import { useCartStore } from "@/lib/cart-store"
-import { Badge } from "@/components/ui/badge"
-import Image from "next/image"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { useGlobalModal } from "@/components/providers/modal-provider"
+import { useState } from "react";
+import { useCartStore } from "@/lib/cart-store";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetFooter,
+} from "@/components/ui/sheet";
+import {
+  ShoppingCart,
+  Trash2,
+  TicketPercent,
+  Loader2,
+  Minus,
+  Plus,
+  X,
+} from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useGlobalModal } from "@/components/providers/modal-provider";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 export function CartSidebar() {
-  const { items, updateQuantity, removeItem, getTotalItems, getTotalPrice, clearCart, addOrder } = useCartStore()
-  const totalItems = getTotalItems()
-  const totalPrice = getTotalPrice()
-  const { showSuccess, showError } = useGlobalModal()
+  const {
+    items,
+    removeItem,
+    updateQuantity,
+    clearCart,
+    getTotalItems,
+    addOrder,
+  } = useCartStore();
+  const totalItems = getTotalItems();
+  const [isOpen, setIsOpen] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const { showSuccess, showError } = useGlobalModal();
 
-  const [isCheckingOut, setIsCheckingOut] = useState(false)
-  const [isOpen, setIsOpen] = useState(false) 
+  // --- VOUCHER STATE ---
+  const [voucherCode, setVoucherCode] = useState("");
+  const [appliedVoucher, setAppliedVoucher] = useState<{
+    code: string;
+    amount: number;
+  } | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+
+  const subTotal = items.reduce(
+    (acc, item) => acc + item.price * item.quantity,
+    0,
+  );
+  const finalTotal = Math.max(0, subTotal - (appliedVoucher?.amount || 0));
+
+  const handleApplyVoucher = async () => {
+    if (!voucherCode) return;
+    setIsValidating(true);
+
+    try {
+      const res = await fetch("/api/vouchers/validate", {
+        method: "POST",
+        body: JSON.stringify({ code: voucherCode, cartTotal: subTotal }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setAppliedVoucher({ code: data.code, amount: data.discountAmount });
+        showSuccess(
+          "Voucher Applied!",
+          `You saved RM${data.discountAmount.toFixed(2)}`,
+        );
+      } else {
+        setAppliedVoucher(null);
+        showError("Invalid Voucher", data.error);
+      }
+    } catch (error) {
+      showError("Error", "Could not validate voucher");
+    } finally {
+      setIsValidating(false);
+    }
+  };
 
   const handleCheckout = async () => {
-    setIsCheckingOut(true)
+    setIsCheckingOut(true);
     try {
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
-      })
+        body: JSON.stringify({
+          items,
+          voucherCode: appliedVoucher?.code,
+        }),
+      });
 
-      const result = await response.json()
+      const data = await response.json();
 
       if (response.ok) {
-        // 1. CHANGED: Status is now "Pending" initially
         addOrder({
-          orderNumber: result.orderNumber,
+          orderNumber: data.orderNumber,
           items: [...items],
-          total: totalPrice,
+          total: finalTotal,
           date: new Date().toLocaleString(),
-          status: "Pending" // <--- Updated here
-        })
-        
-        // 2. Clear and Close
-        clearCart()
-        setIsOpen(false)
-        
-        // 3. Feedback
-        showSuccess("Order Placed!", "Your order is pending confirmation.")
+          status: "Pending",
+        });
+
+        clearCart();
+        setAppliedVoucher(null);
+        setVoucherCode("");
+        setIsOpen(false);
+        showSuccess("Order Placed!", `Order #${data.orderNumber} confirmed.`);
       } else {
-        showError("Checkout Failed", result.error || "Something went wrong.")
+        showError("Checkout Failed", data.error);
       }
     } catch (error) {
-      showError("System Error", "Could not connect to the server.")
+      showError("Error", "Something went wrong.");
     } finally {
-      setIsCheckingOut(false)
+      setIsCheckingOut(false);
     }
-  }
+  };
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
-        <Button variant="outline" size="icon" className="relative bg-transparent border-none hover:bg-accent">
-          <ShoppingCart className="h-5 w-5" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative hover:bg-accent/50 transition-colors"
+        >
+          <ShoppingCart className="h-5 w-5 text-foreground/80" />
           {totalItems > 0 && (
-            <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs animate-in zoom-in">
+            <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] font-bold bg-primary text-primary-foreground animate-in zoom-in border-2 border-background">
               {totalItems}
             </Badge>
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-lg flex flex-col h-full">
-        <SheetHeader>
-          <SheetTitle>Your Cart ({totalItems} items)</SheetTitle>
+
+      <SheetContent className="flex flex-col w-full sm:max-w-md p-0 gap-0 border-l shadow-2xl">
+        {/* HEADER */}
+        <SheetHeader className="p-6 border-b bg-background/50 backdrop-blur-sm sticky top-0 z-10">
+          <SheetTitle className="flex items-center gap-2 text-xl font-bold">
+            <ShoppingCart className="w-5 h-5" /> Your Cart
+            <span className="text-sm font-normal text-muted-foreground ml-auto">
+              {totalItems} {totalItems === 1 ? "Item" : "Items"}
+            </span>
+          </SheetTitle>
         </SheetHeader>
 
+        {/* EMPTY STATE */}
         {items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center flex-1 text-center">
-            <ShoppingCart className="h-16 w-16 text-muted-foreground mb-4 opacity-50" />
-            <p className="text-lg font-medium text-muted-foreground">Your cart is empty</p>
-            <p className="text-sm text-muted-foreground mt-1">Add delicious items from the menu!</p>
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center space-y-4">
+            <div className="w-20 h-20 bg-muted/50 rounded-full flex items-center justify-center">
+              <ShoppingCart className="h-10 w-10 opacity-20" />
+            </div>
+            <div>
+              <p className="font-semibold text-lg text-foreground">
+                Your cart is empty
+              </p>
+              <p className="text-sm">
+                Looks like you haven't added anything yet.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setIsOpen(false)}
+              className="mt-4"
+            >
+              Browse Menu
+            </Button>
           </div>
         ) : (
           <>
-            <ScrollArea className="flex-1 pr-4 mt-6 -mr-4">
-              <div className="space-y-4">
-                {items.map((item) => (
-                  <div key={item._id} className="flex gap-4 p-4 border rounded-lg bg-card/50">
-                    <div className="relative w-20 h-20 rounded-md overflow-hidden flex-shrink-0 border">
-                      <Image src={item.image || "/placeholder.svg"} alt={item.name} fill className="object-cover" />
-                    </div>
-                    <div className="flex-1 min-w-0 flex flex-col justify-between">
-                      <div>
-                        <h4 className="font-semibold text-sm truncate">{item.name}</h4>
-                        <p className="text-sm font-bold text-primary mt-1">RM{item.price.toFixed(2)}</p>
+            {/* CART ITEMS LIST */}
+            <ScrollArea className="flex-1 p-6">
+              <div className="space-y-6">
+                {items.map((item, index) => (
+                  <div key={item._id} className="group">
+                    <div className="flex gap-4">
+                      {/* Image Thumbnail */}
+                      <div className="relative w-20 h-20 rounded-xl overflow-hidden border bg-muted flex-shrink-0 shadow-sm">
+                        <Image
+                          src={item.image || "/placeholder.svg"}
+                          alt={item.name}
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
                       </div>
-                      <div className="flex items-center gap-2 mt-2">
-                         <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => updateQuantity(item._id, item.quantity - 1)} disabled={isCheckingOut}><Minus className="h-3 w-3" /></Button>
-                         <span className="text-sm font-medium min-w-[20px] text-center">{item.quantity}</span>
-                         <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => updateQuantity(item._id, item.quantity + 1)} disabled={isCheckingOut}><Plus className="h-3 w-3" /></Button>
-                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0 ml-auto text-destructive hover:bg-destructive/10" onClick={() => removeItem(item._id)} disabled={isCheckingOut}><Trash2 className="h-3 w-3" /></Button>
+
+                      {/* Item Details */}
+                      <div className="flex-1 flex flex-col justify-between py-0.5">
+                        <div className="flex justify-between items-start gap-2">
+                          <div>
+                            <h4 className="font-semibold text-base leading-tight line-clamp-2">
+                              {item.name}
+                            </h4>
+                            <p className="text-sm font-bold text-primary mt-1">
+                              RM{item.price.toFixed(2)}
+                            </p>
+                          </div>
+
+                          {/* Remove Button */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 -mr-2 -mt-2 transition-colors"
+                            onClick={() => removeItem(item._id)}
+                            disabled={isCheckingOut}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        {/* Quantity & Subtotal Row */}
+                        <div className="flex items-center justify-between mt-3">
+                          {/* Modern Quantity Pill */}
+                          <div className="flex items-center bg-muted/50 rounded-full border shadow-sm">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-l-full hover:bg-background transition-colors"
+                              onClick={() =>
+                                updateQuantity(
+                                  item._id,
+                                  Math.max(1, item.quantity - 1),
+                                )
+                              }
+                              disabled={isCheckingOut || item.quantity <= 1}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="text-sm font-semibold w-8 text-center tabular-nums">
+                              {item.quantity}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-r-full hover:bg-background transition-colors"
+                              onClick={() =>
+                                updateQuantity(item._id, item.quantity + 1)
+                              }
+                              disabled={isCheckingOut}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+
+                          <span className="font-bold text-sm">
+                            RM{(item.price * item.quantity).toFixed(2)}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right flex flex-col justify-end">
-                      <p className="text-sm font-bold">RM{(item.price * item.quantity).toFixed(2)}</p>
-                    </div>
+                    {index < items.length - 1 && (
+                      <Separator className="mt-6 bg-border/50" />
+                    )}
                   </div>
                 ))}
               </div>
             </ScrollArea>
 
-            <div className="border-t pt-4 mt-4 space-y-4 mb-6">
-              <div className="flex items-center justify-between text-lg font-bold">
-                <span>Total</span>
-                <span className="text-primary text-xl">RM{totalPrice.toFixed(2)}</span>
+            {/* FOOTER SECTION */}
+            <div className="p-6 bg-muted/10 border-t shadow-[0_-4px_16px_rgba(0,0,0,0.05)] space-y-4">
+              {/* Voucher Input Group */}
+              <div className="space-y-2">
+                {appliedVoucher ? (
+                  <div className="flex items-center justify-between bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-md">
+                    <div className="flex items-center gap-2">
+                      <TicketPercent className="w-4 h-4" />
+                      <span className="text-sm font-medium">
+                        Code <strong>{appliedVoucher.code}</strong> applied
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-1 text-green-700 hover:text-green-800 hover:bg-green-100"
+                      onClick={() => {
+                        setAppliedVoucher(null);
+                        setVoucherCode("");
+                      }}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <TicketPercent className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Voucher Code"
+                        value={voucherCode}
+                        onChange={(e) =>
+                          setVoucherCode(e.target.value.toUpperCase())
+                        }
+                        disabled={isCheckingOut}
+                        className="pl-9 bg-background"
+                      />
+                    </div>
+                    <Button
+                      variant="secondary"
+                      onClick={handleApplyVoucher}
+                      disabled={!voucherCode || isValidating || isCheckingOut}
+                    >
+                      {isValidating ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        "Apply"
+                      )}
+                    </Button>
+                  </div>
+                )}
               </div>
-              
-              <div className="space-y-3">
-                <Button className="w-full font-bold" size="lg" onClick={handleCheckout} disabled={isCheckingOut}>
-                  {isCheckingOut ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Place Order"}
-                </Button>
-                
-                <Button variant="outline" className="w-full" onClick={clearCart} disabled={isCheckingOut}>
-                  Clear Cart
-                </Button>
+
+              <Separator className="bg-border/60" />
+
+              {/* Totals Summary */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span>RM{subTotal.toFixed(2)}</span>
+                </div>
+
+                {appliedVoucher && (
+                  <div className="flex justify-between text-sm text-green-600 font-medium animate-in slide-in-from-left-2">
+                    <span>Discount</span>
+                    <span>-RM{appliedVoucher.amount.toFixed(2)}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-end pt-2 mt-2">
+                  <span className="text-base font-medium">Total</span>
+                  <span className="text-2xl font-bold tracking-tight text-primary">
+                    RM{finalTotal.toFixed(2)}
+                  </span>
+                </div>
               </div>
+
+              {/* Main Action */}
+              <Button
+                className="w-full text-lg font-bold h-12 shadow-md hover:shadow-lg transition-all"
+                onClick={handleCheckout}
+                disabled={isCheckingOut}
+              >
+                {isCheckingOut ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  "Checkout Now"
+                )}
+              </Button>
             </div>
           </>
         )}
       </SheetContent>
     </Sheet>
-  )
+  );
 }
