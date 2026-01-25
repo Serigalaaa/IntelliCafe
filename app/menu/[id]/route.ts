@@ -9,6 +9,8 @@ export async function PUT(
   try {
     const body = await request.json()
     const client = await clientPromise
+    if (!client) throw new Error("Database connection failed")
+
     const db = client.db("intellicafe")
 
     const { id, ...updateData } = body
@@ -37,6 +39,8 @@ export async function DELETE(
 ) {
   try {
     const client = await clientPromise
+    if (!client) throw new Error("Database connection failed")
+
     const db = client.db("intellicafe")
 
     const result = await db

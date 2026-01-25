@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCartStore } from "@/lib/cart-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,8 +10,14 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-  SheetFooter,
 } from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ShoppingCart,
   Trash2,
@@ -20,13 +26,13 @@ import {
   Minus,
   Plus,
   X,
+  Gift, // Added Gift icon
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useGlobalModal } from "@/components/providers/modal-provider";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import Image from "next/image";
-import { cn } from "@/lib/utils";
 
 export function CartSidebar() {
   const {
@@ -50,25 +56,47 @@ export function CartSidebar() {
   } | null>(null);
   const [isValidating, setIsValidating] = useState(false);
 
+  // --- AVAILABLE VOUCHERS STATE ---
+  const [availableVouchers, setAvailableVouchers] = useState<any[]>([]);
+
+  // Fetch Vouchers when sheet opens
+  useEffect(() => {
+    if (isOpen) {
+      // Fetch vouchers (limit=100 to get a good list for the dropdown)
+      fetch("/api/vouchers?limit=100")
+        .then((res) => res.json())
+        .then((data) => {
+          // The API returns { vouchers: [...] }, so we extract that array
+          if (data.vouchers && Array.isArray(data.vouchers)) {
+            // Optional: Filter only active ones on the client side if API returns all
+            const active = data.vouchers.filter((v: any) => v.isActive);
+            setAvailableVouchers(active);
+          }
+        })
+        .catch((err) => console.error("Failed to load vouchers", err));
+    }
+  }, [isOpen]);
+
   const subTotal = items.reduce(
     (acc, item) => acc + item.price * item.quantity,
     0,
   );
   const finalTotal = Math.max(0, subTotal - (appliedVoucher?.amount || 0));
 
-  const handleApplyVoucher = async () => {
-    if (!voucherCode) return;
+  const validateVoucher = async (codeToUse: string) => {
+    if (!codeToUse) return;
     setIsValidating(true);
 
     try {
       const res = await fetch("/api/vouchers/validate", {
         method: "POST",
-        body: JSON.stringify({ code: voucherCode, cartTotal: subTotal }),
+        body: JSON.stringify({ code: codeToUse, cartTotal: subTotal }),
       });
       const data = await res.json();
 
       if (res.ok) {
         setAppliedVoucher({ code: data.code, amount: data.discountAmount });
+        setVoucherCode(data.code); // Sync input
         showSuccess(
           "Voucher Applied!",
           `You saved RM${data.discountAmount.toFixed(2)}`,
@@ -82,6 +110,11 @@ export function CartSidebar() {
     } finally {
       setIsValidating(false);
     }
+  };
+
+  const handleSelectVoucher = (value: string) => {
+    setVoucherCode(value);
+    validateVoucher(value);
   };
 
   const handleCheckout = async () => {
@@ -202,7 +235,6 @@ export function CartSidebar() {
                             </p>
                           </div>
 
-                          {/* Remove Button */}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -214,9 +246,7 @@ export function CartSidebar() {
                           </Button>
                         </div>
 
-                        {/* Quantity & Subtotal Row */}
                         <div className="flex items-center justify-between mt-3">
-                          {/* Modern Quantity Pill */}
                           <div className="flex items-center bg-muted/50 rounded-full border shadow-sm">
                             <Button
                               variant="ghost"
@@ -264,10 +294,42 @@ export function CartSidebar() {
 
             {/* FOOTER SECTION */}
             <div className="p-6 bg-muted/10 border-t shadow-[0_-4px_16px_rgba(0,0,0,0.05)] space-y-4">
-              {/* Voucher Input Group */}
-              <div className="space-y-2">
+              {/* VOUCHER SECTION */}
+              <div className="space-y-3">
+                {/* 1. VOUCHER DROPDOWN (Available if not applied and list exists) */}
+                {!appliedVoucher && availableVouchers.length > 0 && (
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground ml-1">
+                      Available Vouchers
+                    </label>
+                    <Select onValueChange={handleSelectVoucher}>
+                      <SelectTrigger className="w-full bg-background">
+                        <SelectValue placeholder="Select a voucher..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableVouchers.map((v) => (
+                          <SelectItem key={v._id} value={v.code}>
+                            <div className="flex items-center gap-2">
+                              <Gift className="w-4 h-4 text-orange-500" />
+                              <span className="font-bold">{v.code}</span>
+                              <span className="text-muted-foreground text-xs">
+                                (
+                                {v.type === "percentage"
+                                  ? `${v.value}%`
+                                  : `RM${v.value}`}{" "}
+                                Off)
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* 2. MANUAL INPUT / APPLIED STATE */}
                 {appliedVoucher ? (
-                  <div className="flex items-center justify-between bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-md">
+                  <div className="flex items-center justify-between bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-md animate-in fade-in">
                     <div className="flex items-center gap-2">
                       <TicketPercent className="w-4 h-4" />
                       <span className="text-sm font-medium">
@@ -291,7 +353,7 @@ export function CartSidebar() {
                     <div className="relative flex-1">
                       <TicketPercent className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
-                        placeholder="Voucher Code"
+                        placeholder="Or enter code manually"
                         value={voucherCode}
                         onChange={(e) =>
                           setVoucherCode(e.target.value.toUpperCase())
@@ -302,7 +364,7 @@ export function CartSidebar() {
                     </div>
                     <Button
                       variant="secondary"
-                      onClick={handleApplyVoucher}
+                      onClick={() => validateVoucher(voucherCode)}
                       disabled={!voucherCode || isValidating || isCheckingOut}
                     >
                       {isValidating ? (
@@ -325,7 +387,7 @@ export function CartSidebar() {
                 </div>
 
                 {appliedVoucher && (
-                  <div className="flex justify-between text-sm text-green-600 font-medium animate-in slide-in-from-left-2">
+                  <div className="flex justify-between text-sm text-green-600 font-medium">
                     <span>Discount</span>
                     <span>-RM{appliedVoucher.amount.toFixed(2)}</span>
                   </div>

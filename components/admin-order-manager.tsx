@@ -18,6 +18,8 @@ import {
   Clock,
   ShoppingBag,
   TicketPercent,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useGlobalModal } from "@/components/providers/modal-provider";
 import {
@@ -34,18 +36,28 @@ import {
 export function AdminOrderManager() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // --- PAGINATION STATE ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  // ------------------------
+
   const [pendingUpdate, setPendingUpdate] = useState<{
     id: string;
     status: string;
   } | null>(null);
-
   const { showConfirm, showSuccess, showError } = useGlobalModal();
 
-  const fetchOrders = async () => {
+  // Updated Fetch Function
+  const fetchOrders = async (page = 1) => {
     try {
-      const res = await fetch("/api/orders");
+      // Fetch with page parameter
+      const res = await fetch(`/api/orders?page=${page}&limit=10`);
       const data = await res.json();
-      setOrders(data);
+
+      setOrders(data.orders);
+      setTotalPages(data.totalPages);
+      setCurrentPage(data.currentPage);
     } catch (error) {
       console.error("Failed to fetch orders:", error);
     } finally {
@@ -54,65 +66,60 @@ export function AdminOrderManager() {
   };
 
   useEffect(() => {
-    fetchOrders();
-    const interval = setInterval(fetchOrders, 30000);
+    fetchOrders(currentPage);
+    // Refresh current page every 30s
+    const interval = setInterval(() => fetchOrders(currentPage), 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [currentPage]); // Re-fetch when page changes
 
+  // ... (Keep confirmStatusUpdate, handleStatusChange, handleDeleteClick, performDelete exactly as they were) ...
   const confirmStatusUpdate = async () => {
     if (!pendingUpdate) return;
     const { id, status } = pendingUpdate;
-
     try {
       await fetch("/api/orders", {
         method: "PUT",
         body: JSON.stringify({ id, status }),
       });
-
       setOrders(orders.map((o) => (o._id === id ? { ...o, status } : o)));
       showSuccess("Status Updated", `Order marked as ${status.toUpperCase()}`);
     } catch (error) {
-      showError("Update Failed", "Could not update order status");
+      showError("Update Failed", "Could not update status");
     } finally {
       setPendingUpdate(null);
     }
   };
 
-  const handleStatusChange = (id: string, newStatus: string) => {
+  const handleStatusChange = (id: string, newStatus: string) =>
     setPendingUpdate({ id, status: newStatus });
-  };
 
   const handleDeleteClick = (id: string) => {
-    showConfirm(
-      "Delete Order?",
-      "Are you sure you want to delete this order?",
-      () => performDelete(id),
-    );
+    showConfirm("Delete Order?", "Are you sure?", () => performDelete(id));
   };
 
   const performDelete = async (id: string) => {
     try {
       const res = await fetch(`/api/orders?id=${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete");
+      if (!res.ok) throw new Error("Failed");
       setOrders((prev) => prev.filter((o) => o._id !== id));
-      showSuccess("Order Deleted", "The order has been removed successfully.");
-    } catch (error) {
-      showError("Delete Failed", "Could not remove the order.");
+      showSuccess("Deleted", "Order removed.");
+    } catch (e) {
+      showError("Error", "Failed to delete.");
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
-        return "bg-yellow-500 hover:bg-yellow-600 text-white";
+        return "bg-yellow-500 text-white";
       case "preparing":
-        return "bg-blue-500 hover:bg-blue-600 text-white";
+        return "bg-blue-500 text-white";
       case "ready":
-        return "bg-indigo-500 hover:bg-indigo-600 text-white";
+        return "bg-indigo-500 text-white";
       case "completed":
-        return "bg-green-600 hover:bg-green-700 text-white";
+        return "bg-green-600 text-white";
       case "cancelled":
-        return "bg-slate-500 hover:bg-slate-600 text-white";
+        return "bg-slate-500 text-white";
       default:
         return "bg-slate-500 text-white";
     }
@@ -129,7 +136,11 @@ export function AdminOrderManager() {
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Incoming Orders</h2>
-        <Button variant="outline" size="sm" onClick={fetchOrders}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fetchOrders(currentPage)}
+        >
           Refresh List
         </Button>
       </div>
@@ -137,7 +148,7 @@ export function AdminOrderManager() {
       {orders.length === 0 ? (
         <div className="text-center p-12 border rounded-lg bg-muted/20 text-muted-foreground">
           <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-20" />
-          <p>No active orders</p>
+          <p>No orders found</p>
         </div>
       ) : (
         <div className="grid gap-4">
@@ -165,11 +176,10 @@ export function AdminOrderManager() {
                     </div>
                   </div>
 
-                  {/* MIDDLE: Items & Pricing */}
+                  {/* MIDDLE: Items */}
                   <div className="flex-1 border-l pl-4 border-gray-100 min-h-[60px]">
                     <div className="space-y-2 mb-3">
                       {order.items.map((item: any, idx: number) => (
-                        // NEW: Flex container to split Name and Price
                         <div
                           key={idx}
                           className="flex justify-between items-start text-sm"
@@ -184,25 +194,18 @@ export function AdminOrderManager() {
                         </div>
                       ))}
                     </div>
-
-                    {/* Total Section with Voucher Badge */}
-                    <div className="space-y-1 border-t pt-2">
-                      <div className="flex justify-between items-center">
-                        {order.voucherCode ? (
-                          <div className="flex items-center gap-1.5 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100 w-fit">
-                            <TicketPercent className="w-3 h-3" />
-                            <span>
-                              {order.voucherCode} (-RM
-                              {order.discount?.toFixed(2)})
-                            </span>
-                          </div>
-                        ) : (
-                          <span></span>
-                        )}
-
-                        <div className="font-bold text-sm">
-                          Total: RM{order.totalAmount?.toFixed(2)}
+                    <div className="space-y-1 border-t pt-2 w-fit">
+                      {order.voucherCode && (
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100 w-fit">
+                          <TicketPercent className="w-3 h-3" />
+                          <span>
+                            {order.voucherCode} (-RM{order.discount?.toFixed(2)}
+                            )
+                          </span>
                         </div>
+                      )}
+                      <div className="font-bold text-sm">
+                        Total: RM{order.totalAmount?.toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -226,7 +229,6 @@ export function AdminOrderManager() {
                         <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
                     </Select>
-
                     <Button
                       variant="destructive"
                       size="icon"
@@ -242,6 +244,36 @@ export function AdminOrderManager() {
         </div>
       )}
 
+      {/* --- PAGINATION CONTROLS --- */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-4 py-4 mt-4 border-t">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+          </Button>
+
+          <span className="text-sm font-medium text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </span>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+            }
+            disabled={currentPage === totalPages}
+          >
+            Next <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
       <AlertDialog
         open={!!pendingUpdate}
         onOpenChange={() => setPendingUpdate(null)}
@@ -251,7 +283,7 @@ export function AdminOrderManager() {
             <AlertDialogTitle>Update Status?</AlertDialogTitle>
             <AlertDialogDescription>
               Change status to{" "}
-              <span className="font-bold text-foreground">
+              <span className="font-bold">
                 "{pendingUpdate?.status.toUpperCase()}"
               </span>
               ?

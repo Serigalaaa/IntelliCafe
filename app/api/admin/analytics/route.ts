@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/mongodb"
 
+export const dynamic = "force-dynamic"
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -11,102 +13,113 @@ export async function GET(request: NextRequest) {
     const db = client.db("intellicafe")
 
     let pipeline: any[] = []
-    
-    // ONLY count 'done' orders
-    const matchStage = { $match: { status: "done" } }
+
+    // 1. STRICT FILTER: Only 'completed' orders
+    const matchStage = { $match: { status: "completed" } }
+
+    // TIMEZONE FIX: Malaysia is UTC+8
+    const MYT_OFFSET = "+08:00"
 
     if (range === "yearly") {
-      // --- YEARLY LOGIC (Last 5 Years) ---
+      // --- YEARLY LOGIC ---
       pipeline = [
         matchStage,
         {
           $group: {
-            _id: { $year: "$createdAt" },
-            total: { $sum: "$totalAmount" }
+            _id: { $year: { date: "$createdAt", timezone: MYT_OFFSET } },
+            total: { $sum: "$totalAmount" },
+            count: { $sum: 1 } // NEW: Count orders
           }
         },
         { $sort: { _id: 1 } }
       ]
 
       const data = await db.collection("orders").aggregate(pipeline).toArray()
-      
+
       const formattedData = data.map(item => ({
         name: item._id.toString(),
-        total: item.total
+        total: item.total,
+        count: item.count // Include count
       }))
-      
+
       return NextResponse.json(formattedData)
 
     } else if (range === "monthly") {
-      // --- MONTHLY LOGIC (Jan - Dec) ---
+      // --- MONTHLY LOGIC ---
       const currentYear = new Date().getFullYear()
+
       pipeline = [
-        { 
-            $match: { 
-                status: "done",
-                createdAt: { 
-                    $gte: new Date(`${currentYear}-01-01`), 
-                    $lte: new Date(`${currentYear}-12-31`) 
-                }
-            } 
+        {
+          $match: {
+            status: "completed",
+            $expr: {
+              $eq: [{ $year: { date: "$createdAt", timezone: MYT_OFFSET } }, currentYear]
+            }
+          }
         },
         {
           $group: {
-            _id: { $month: "$createdAt" },
-            total: { $sum: "$totalAmount" }
+            _id: { $month: { date: "$createdAt", timezone: MYT_OFFSET } },
+            total: { $sum: "$totalAmount" },
+            count: { $sum: 1 } // NEW: Count orders
           }
         }
       ]
 
       const data = await db.collection("orders").aggregate(pipeline).toArray()
       const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-      
-      // Fill in all 12 months, even if 0
+
       const formattedData = monthNames.map((name, index) => {
-          const found = data.find(d => d._id === index + 1)
-          return { name, total: found ? found.total : 0 }
+        const found = data.find(d => d._id === index + 1)
+        return {
+          name,
+          total: found ? found.total : 0,
+          count: found ? found.count : 0 // Include count
+        }
       })
 
       return NextResponse.json(formattedData)
 
     } else {
-      // --- WEEKLY LOGIC (Last 7 Days) ---
-      // 1. Calculate the date 7 days ago
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6) // -6 to include today
-      sevenDaysAgo.setHours(0, 0, 0, 0)
+      // --- WEEKLY LOGIC ---
+      const now = new Date()
+      const nowMYT = new Date(now.getTime() + (8 * 60 * 60 * 1000))
+
+      const sevenDaysAgoMYT = new Date(nowMYT)
+      sevenDaysAgoMYT.setDate(sevenDaysAgoMYT.getDate() - 6)
+      sevenDaysAgoMYT.setHours(0, 0, 0, 0)
+
+      const queryDateUTC = new Date(sevenDaysAgoMYT.getTime() - (8 * 60 * 60 * 1000))
 
       pipeline = [
-        { 
-            $match: { 
-                status: "done",
-                createdAt: { $gte: sevenDaysAgo }
-            } 
+        {
+          $match: {
+            status: "completed",
+            createdAt: { $gte: queryDateUTC }
+          }
         },
         {
           $group: {
-            // Group by YYYY-MM-DD to match easier
-            _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-            total: { $sum: "$totalAmount" }
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt", timezone: MYT_OFFSET } },
+            total: { $sum: "$totalAmount" },
+            count: { $sum: 1 } // NEW: Count orders
           }
         }
       ]
 
       const data = await db.collection("orders").aggregate(pipeline).toArray()
 
-      // 2. Generate the last 7 days manually to ensure no gaps
       const formattedData = []
       for (let i = 6; i >= 0; i--) {
-        const d = new Date()
+        const d = new Date(nowMYT)
         d.setDate(d.getDate() - i)
-        const dateString = d.toISOString().split('T')[0] // "2024-03-20"
-        
-        // Find if we have sales for this specific date string
+        const dateString = d.toISOString().split('T')[0]
         const found = data.find(item => item._id === dateString)
-        
+
         formattedData.push({
-            name: d.toLocaleDateString('en-US', { weekday: 'short' }), // "Mon"
-            total: found ? found.total : 0
+          name: d.toLocaleDateString('en-US', { weekday: 'short' }),
+          total: found ? found.total : 0,
+          count: found ? found.count : 0 // Include count
         })
       }
 

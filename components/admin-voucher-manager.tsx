@@ -21,39 +21,63 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Ticket, Plus, Loader2 } from "lucide-react";
+// Added ChevronLeft and ChevronRight
+import {
+  Trash2,
+  Ticket,
+  Plus,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { useGlobalModal } from "@/components/providers/modal-provider";
 
 export function AdminVoucherManager() {
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+
+  // --- PAGINATION STATE ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  // ------------------------
+
   const { showSuccess, showError, showConfirm } = useGlobalModal();
 
   // Form State
   const [formData, setFormData] = useState({
     code: "",
-    type: "percentage", // 'percentage' | 'fixed'
+    type: "percentage",
     value: "",
-    limitType: "daily", // 'daily' | 'unlimited'
+    limitType: "daily",
     description: "",
   });
 
-  const fetchVouchers = async () => {
+  // Updated Fetch to accept page
+  const fetchVouchers = async (page = 1) => {
     try {
-      const res = await fetch("/api/vouchers");
+      setLoading(true);
+      const res = await fetch(`/api/vouchers?page=${page}&limit=10`);
       const data = await res.json();
-      setVouchers(data);
+
+      if (data.vouchers) {
+        setVouchers(data.vouchers);
+        setTotalPages(data.totalPages);
+        setCurrentPage(data.currentPage);
+      } else {
+        setVouchers([]);
+      }
     } catch (e) {
       console.error(e);
+      showError("Error", "Failed to fetch vouchers");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchVouchers();
-  }, []);
+    fetchVouchers(currentPage);
+  }, [currentPage]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +96,8 @@ export function AdminVoucherManager() {
           limitType: "daily",
           description: "",
         });
-        fetchVouchers();
+        // Refresh current page (or go to page 1 to see new item)
+        fetchVouchers(1);
       } else {
         const err = await res.json();
         showError("Error", err.error);
@@ -90,7 +115,7 @@ export function AdminVoucherManager() {
       "Users will no longer be able to use this code.",
       async () => {
         await fetch(`/api/vouchers?id=${id}`, { method: "DELETE" });
-        fetchVouchers();
+        fetchVouchers(currentPage); // Refresh current page
         showSuccess("Deleted", "Voucher removed.");
       },
     );
@@ -202,50 +227,85 @@ export function AdminVoucherManager() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <Loader2 className="mx-auto animate-spin" />
+            <div className="flex justify-center p-8">
+              <Loader2 className="animate-spin" />
+            </div>
           ) : vouchers.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
               No vouchers created yet.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Discount</TableHead>
-                  <TableHead>Limit</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {vouchers.map((v) => (
-                  <TableRow key={v._id}>
-                    <TableCell className="font-bold font-mono">
-                      {v.code}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {v.type === "percentage"
-                          ? `${v.value}%`
-                          : `RM${v.value}`}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="capitalize text-xs">
-                      {v.limitType}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(v._id)}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Discount</TableHead>
+                    <TableHead>Limit</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {vouchers.map((v) => (
+                    <TableRow key={v._id}>
+                      <TableCell className="font-bold font-mono">
+                        {v.code}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {v.type === "percentage"
+                            ? `${v.value}%`
+                            : `RM${v.value}`}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="capitalize text-xs">
+                        {v.limitType}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(v._id)}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* --- PAGINATION CONTROLS --- */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-4 py-4 mt-4 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(1, prev - 1))
+                    }
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+                  </Button>
+
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Page {currentPage} of {totalPages}
+                  </span>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                  >
+                    Next <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

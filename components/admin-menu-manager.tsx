@@ -18,11 +18,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-// FIX 1: Import Trash2 instead of Trash to match Order Manager
-import { Edit, Trash2, Plus, Loader2, ImageIcon, Package } from "lucide-react";
+import {
+  Edit,
+  Trash2,
+  Plus,
+  Loader2,
+  ImageIcon,
+  Package,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { useGlobalModal } from "@/components/providers/modal-provider";
 
-// ... (Keep your existing Interface & Categories) ...
 interface MenuItem {
   _id: string;
   name: string;
@@ -36,9 +43,13 @@ interface MenuItem {
 const CATEGORIES = ["coffee", "tea", "pastry", "sandwich", "dessert"];
 
 export function AdminMenuManager() {
-  // ... (Keep all your existing State & Logic unchanged) ...
   const [items, setItems] = useState<MenuItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // --- PAGINATION STATE ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -55,22 +66,35 @@ export function AdminMenuManager() {
     available: true,
   });
 
-  // ... (Keep your fetch, upload, and submit functions exactly as they were) ...
-  useEffect(() => {
-    fetchMenuItems();
-  }, []);
-
-  const fetchMenuItems = async () => {
+  const fetchMenuItems = async (page = 1) => {
     try {
-      const response = await fetch("/api/menu");
+      setIsLoading(true);
+      const response = await fetch(`/api/menu?page=${page}&limit=10`);
+
+      if (!response.ok) throw new Error("Failed to fetch");
+
       const data = await response.json();
-      setItems(data);
+
+      if (data.items && Array.isArray(data.items)) {
+        setItems(data.items);
+        setTotalPages(data.totalPages || 1);
+        setCurrentPage(data.currentPage || 1);
+      } else if (Array.isArray(data)) {
+        setItems(data);
+      } else {
+        setItems([]);
+      }
     } catch (error) {
-      showError("Error", "Failed to load");
+      showError("Error", "Failed to load menu");
+      setItems([]);
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchMenuItems(currentPage);
+  }, [currentPage]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -97,7 +121,6 @@ export function AdminMenuManager() {
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    // ... (Keep your existing upload logic) ...
     const file = e.target.files?.[0];
     if (!file) return;
     setIsUploading(true);
@@ -121,25 +144,34 @@ export function AdminMenuManager() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    // ... (Keep your existing submit logic) ...
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      // FIX: Use Dynamic Route for PUT
       const url = editingId ? `/api/menu/${editingId}` : "/api/menu";
       const method = editingId ? "PUT" : "POST";
+
+      // We don't need to send _id in body for PUT if it's in the URL,
+      // but keeping it safe doesn't hurt.
+      const bodyData = formData;
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(bodyData),
       });
+
       if (res.ok) {
         setIsDialogOpen(false);
-        fetchMenuItems();
+        fetchMenuItems(currentPage);
         resetForm();
         showSuccess("Success", "Saved");
+      } else {
+        const err = await res.json();
+        throw new Error(err.error || "Failed");
       }
-    } catch (e) {
-      showError("Error", "Failed");
+    } catch (e: any) {
+      showError("Error", e.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -147,27 +179,26 @@ export function AdminMenuManager() {
 
   const handleDeleteClick = (id: string) => {
     showConfirm("Delete Item?", "Permanently remove this item?", async () => {
+      // FIX: Use Dynamic Route for DELETE (No query param ?id=)
       const res = await fetch(`/api/menu/${id}`, { method: "DELETE" });
       if (res.ok) {
-        fetchMenuItems();
+        fetchMenuItems(currentPage);
         showSuccess("Deleted", "Item removed");
+      } else {
+        showError("Error", "Failed to delete");
       }
     });
   };
 
   return (
     <div className="space-y-4">
-      {" "}
-      {/* FIX 2: Matched spacing with Order Manager */}
-      {/* FIX 3: Standardized Header (text-xl instead of 2xl, match Order Manager) */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Menu Management</h2>
         <Button onClick={handleOpenAdd} size="sm">
-          {" "}
-          {/* FIX 4: Added size="sm" */}
           <Plus className="w-4 h-4 mr-2" /> Add Item
         </Button>
       </div>
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -176,7 +207,6 @@ export function AdminMenuManager() {
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* ... (Keep your form inputs exactly as they were) ... */}
             <div>
               <Label>Name</Label>
               <Input
@@ -252,6 +282,7 @@ export function AdminMenuManager() {
                   <img
                     src={formData.image}
                     className="w-16 h-16 rounded border object-cover"
+                    alt="Preview"
                   />
                 ) : (
                   <div className="w-16 h-16 rounded border bg-muted flex items-center justify-center">
@@ -274,63 +305,99 @@ export function AdminMenuManager() {
           </form>
         </DialogContent>
       </Dialog>
+
       <Card className="p-0 border-0 shadow-none bg-transparent">
         <div className="space-y-4">
-          {items.map((item) => (
-            // FIX 5: Updated Card styling to match the Order Cards better
-            <Card key={item._id} className="overflow-hidden">
-              <div className="flex items-center gap-4 p-4">
-                <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-md border bg-muted flex items-center justify-center">
-                  {item.image ? (
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                  )}
-                </div>
-
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">{item.name}</h3>
-                    <div
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1 ${item.stock > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
-                    >
-                      <Package className="w-3 h-3" />
-                      {item.stock > 0
-                        ? `${item.stock} in stock`
-                        : "Out of Stock"}
-                    </div>
+          {isLoading ? (
+            <div className="flex justify-center p-8">
+              <Loader2 className="animate-spin" />
+            </div>
+          ) : !items || items.length === 0 ? (
+            <div className="text-center p-8 border rounded-lg bg-muted/20 text-muted-foreground">
+              No menu items found.
+            </div>
+          ) : (
+            items.map((item) => (
+              <Card key={item._id} className="overflow-hidden">
+                <div className="flex items-center gap-4 p-4">
+                  <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-md border bg-muted flex items-center justify-center">
+                    {item.image ? (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                    )}
                   </div>
-                  <p className="text-sm text-muted-foreground capitalize">
-                    {item.category} • RM
-                    {item.price ? item.price.toFixed(2) : "0.00"}
-                  </p>
-                </div>
 
-                <div className="flex gap-2">
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => handleOpenEdit(item)}
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  {/* FIX 6: Switched to Trash2 to match Order Manager */}
-                  <Button
-                    size="icon"
-                    variant="destructive"
-                    onClick={() => handleDeleteClick(item._id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">{item.name}</h3>
+                      <div
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1 ${item.stock > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
+                      >
+                        <Package className="w-3 h-3" />
+                        {item.stock > 0
+                          ? `${item.stock} in stock`
+                          : "Out of Stock"}
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground capitalize">
+                      {item.category} • RM
+                      {item.price ? item.price.toFixed(2) : "0.00"}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => handleOpenEdit(item)}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      onClick={() => handleDeleteClick(item._id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))
+          )}
         </div>
+
+        {/* --- PAGINATION CONTROLS --- */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-4 py-4 mt-4 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+            </Button>
+            <span className="text-sm font-medium text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+              }
+              disabled={currentPage === totalPages}
+            >
+              Next <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+          </div>
+        )}
       </Card>
     </div>
   );

@@ -10,15 +10,17 @@ export async function GET() {
     if (!client) throw new Error("Database connection failed")
     const db = client.db("intellicafe")
 
-    // 1. Total Orders
-    const totalOrders = await db.collection("orders").countDocuments()
+    // 1. Total Orders (STRICT: Only 'completed')
+    // previously: .countDocuments() -> counted pending/cancelled too
+    const totalOrders = await db.collection("orders").countDocuments({
+      status: "completed"
+    })
 
     // 2. Total Users
     const totalUsers = await db.collection("users").countDocuments({ role: "user" })
 
-    // 3. Total Feedback (Keep your smart check)
+    // 3. Total Feedback (Smart check for plural/singular collection name)
     let totalFeedback = await db.collection("feedbacks").countDocuments()
-
     if (totalFeedback === 0) {
       const singularCount = await db.collection("feedback").countDocuments()
       if (singularCount > 0) {
@@ -26,10 +28,9 @@ export async function GET() {
       }
     }
 
-    // 4. Total Revenue (FIXED: Match "completed" instead of "done")
+    // 4. Total Revenue (STRICT: Only 'completed')
     const revenueResult = await db.collection("orders").aggregate([
       {
-        // CRITICAL FIX: Your app uses "completed", not "done"
         $match: { status: "completed" }
       },
       {

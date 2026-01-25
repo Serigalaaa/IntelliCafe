@@ -8,59 +8,62 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogDescription, // Import this for accessibility
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Receipt, Loader2, Trash2 } from "lucide-react"; // Import Trash2 icon
+import { Receipt, Loader2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/hooks/use-auth"; // To check if user is logged in
-import { useToast } from "@/components/ui/use-toast"; // Optional: for success message
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/components/ui/use-toast";
 
 export function ReceiptButton() {
   const [open, setOpen] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const { user } = useAuth(); // Get current user status
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      // Fetch history (works for both Guest & Logged In)
       const res = await fetch("/api/orders?history=true");
       const data = await res.json();
-      setOrders(data);
+
+      if (Array.isArray(data)) {
+        setOrders(data);
+      } else if (data.orders && Array.isArray(data.orders)) {
+        setOrders(data.orders);
+      } else {
+        setOrders([]);
+      }
     } catch (error) {
       console.error("Failed to load history");
+      setOrders([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Auto-fetch when modal opens
   useEffect(() => {
     if (open) fetchHistory();
   }, [open]);
 
-  // --- NEW: Reset Guest History Function ---
   const handleClearGuestHistory = async () => {
     if (!confirm("This will clear your temporary order history. Are you sure?"))
       return;
-
     try {
       await fetch("/api/auth/reset-guest", { method: "POST" });
-      setOrders([]); // Clear the list instantly
+      setOrders([]);
       toast({
         title: "History Cleared",
         description: "You are now a new guest.",
       });
-      setOpen(false); // Close modal
-      window.location.reload(); // Optional: Refresh to ensure fresh state
+      setOpen(false);
+      window.location.reload();
     } catch (error) {
       console.error("Failed to reset");
     }
   };
-  // -----------------------------------------
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -69,9 +72,10 @@ export function ReceiptButton() {
       case "preparing":
         return "bg-blue-100 text-blue-800 border-blue-200";
       case "ready":
-        return "bg-green-100 text-green-800 border-green-200";
+        return "bg-indigo-100 text-indigo-800 border-indigo-200";
+      // UPDATED: Completed is now Green
       case "completed":
-        return "bg-gray-100 text-gray-800 border-gray-200";
+        return "bg-green-600 text-white border-green-600 hover:bg-green-700";
       default:
         return "bg-slate-100 text-slate-800";
     }
@@ -80,11 +84,8 @@ export function ReceiptButton() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {/* Changed size="icon" to size="sm" and added gap-2 for spacing */}
         <Button variant="outline" size="sm" className="gap-2">
           <Receipt className="h-4 w-4" />
-          {/* This text will show on Desktop (md) and hide on Mobile to save space. 
-        Remove "hidden md:inline" if you want text on mobile too. */}
           <span className="hidden md:inline font-semibold">Order History</span>
         </Button>
       </DialogTrigger>
@@ -101,7 +102,7 @@ export function ReceiptButton() {
           <div className="flex justify-center p-8">
             <Loader2 className="animate-spin" />
           </div>
-        ) : orders.length === 0 ? (
+        ) : !orders || orders.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             No past orders found.
           </div>
@@ -128,11 +129,10 @@ export function ReceiptButton() {
                         variant="outline"
                         className={`mt-1 ${getStatusColor(order.status)}`}
                       >
-                        {order.status}
+                        {order.status.toUpperCase()}
                       </Badge>
                     </div>
                   </div>
-
                   <div className="text-sm text-slate-600 border-t pt-2 mt-2">
                     {order.items.map((item: any, idx: number) => (
                       <div
@@ -151,8 +151,7 @@ export function ReceiptButton() {
           </ScrollArea>
         )}
 
-        {/* --- NEW: Show Clear Button ONLY for Guests --- */}
-        {!user && orders.length > 0 && (
+        {!user && orders && orders.length > 0 && (
           <div className="mt-4 pt-2 border-t flex justify-end">
             <Button
               variant="ghost"
@@ -160,8 +159,7 @@ export function ReceiptButton() {
               className="text-red-500 hover:text-red-700 hover:bg-red-50"
               onClick={handleClearGuestHistory}
             >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Clear Guest History
+              <Trash2 className="w-4 h-4 mr-2" /> Clear Guest History
             </Button>
           </div>
         )}

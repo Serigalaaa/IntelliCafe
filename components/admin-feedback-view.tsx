@@ -1,215 +1,280 @@
-"use client"
+"use client";
 
-// ... imports remain the same
-import { useEffect, useState } from "react"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Star, Trash2, Edit2, Save, X, Loader2 } from "lucide-react"
-import { useGlobalModal } from "@/components/providers/modal-provider"
+import { useEffect, useState } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+// Added Chevron icons
+import {
+  Star,
+  Trash2,
+  Edit2,
+  Save,
+  X,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { useGlobalModal } from "@/components/providers/modal-provider";
 
 interface Feedback {
-  _id: string
-  name: string
-  email: string
-  rating: number
-  message: string
-  createdAt: string
+  _id: string;
+  name: string;
+  email: string;
+  rating: number;
+  message: string;
+  createdAt: string;
 }
 
 export function AdminFeedbackView() {
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([])
-  const [loading, setLoading] = useState(true)
-  
-  // 1. Destructure showConfirm
-  const { showSuccess, showError, showConfirm } = useGlobalModal()
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // State for Editing
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<Partial<Feedback>>({})
-  const [isSaving, setIsSaving] = useState(false)
+  // --- PAGINATION STATE ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  // ------------------------
 
-  useEffect(() => {
-    fetchFeedbacks()
-  }, [])
+  const { showSuccess, showError, showConfirm } = useGlobalModal();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Feedback>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
-  const fetchFeedbacks = async () => {
+  // Update fetch to use page
+  const fetchFeedbacks = async (page = 1) => {
     try {
-      const response = await fetch("/api/feedback")
-      const data = await response.json()
-      setFeedbacks(data)
-    } catch (error) {
-      console.error("Failed to fetch feedbacks:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+      setLoading(true);
+      const response = await fetch(`/api/feedback?page=${page}&limit=10`);
+      const data = await response.json();
 
-  // --- DELETE FUNCTION (UPDATED) ---
-  const handleDeleteClick = (id: string) => {
-    // 2. Trigger the global modal instead of window.confirm
-    showConfirm(
-        "Delete Feedback?", 
-        "Are you sure you want to permanently delete this customer feedback? This action cannot be undone.",
-        () => performDelete(id) // Pass the actual delete function here
-    )
-  }
-
-  // 3. The actual logic runs ONLY after they click "Confirm" in the modal
-  const performDelete = async (id: string) => {
-    try {
-      const res = await fetch(`/api/feedback?id=${id}`, { method: "DELETE" })
-
-      if (res.ok) {
-        setFeedbacks((prev) => prev.filter((item) => item._id !== id))
-        showSuccess("Deleted!", "The feedback has been removed successfully.")
+      if (data.feedbacks) {
+        setFeedbacks(data.feedbacks);
+        setTotalPages(data.totalPages);
+        setCurrentPage(data.currentPage);
       } else {
-        showError("Error", "Failed to delete feedback.")
+        setFeedbacks([]);
       }
     } catch (error) {
-      console.error("Delete error:", error)
-      showError("Error", "An unexpected error occurred.")
+      console.error("Failed to fetch feedbacks:", error);
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
-  // ... (Edit functions remain exactly the same as before) ...
+  useEffect(() => {
+    fetchFeedbacks(currentPage);
+  }, [currentPage]);
+
+  const handleDeleteClick = (id: string) => {
+    showConfirm("Delete Feedback?", "Are you sure?", () => performDelete(id));
+  };
+
+  const performDelete = async (id: string) => {
+    try {
+      const res = await fetch(`/api/feedback?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        // Refresh current page to keep data consistent
+        fetchFeedbacks(currentPage);
+        showSuccess("Deleted!", "Feedback removed.");
+      } else {
+        showError("Error", "Failed to delete.");
+      }
+    } catch (error) {
+      showError("Error", "Unexpected error.");
+    }
+  };
+
+  // ... (Keep startEditing, cancelEditing, handleSave exactly as they are) ...
   const startEditing = (feedback: Feedback) => {
-    setEditingId(feedback._id)
-    setEditForm(feedback)
-  }
-
+    setEditingId(feedback._id);
+    setEditForm(feedback);
+  };
   const cancelEditing = () => {
-    setEditingId(null)
-    setEditForm({})
-  }
-
+    setEditingId(null);
+    setEditForm({});
+  };
   const handleSave = async () => {
-    if (!editingId) return
-    setIsSaving(true)
-
+    if (!editingId) return;
+    setIsSaving(true);
     try {
       const res = await fetch(`/api/feedback`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: editingId, ...editForm }),
-      })
-
+      });
       if (res.ok) {
-        setFeedbacks((prev) =>
-          prev.map((item) => (item._id === editingId ? { ...item, ...editForm } : item))
-        )
-        setEditingId(null)
-        showSuccess("Updated!", "Customer feedback has been updated successfully.")
+        fetchFeedbacks(currentPage); // Refresh
+        setEditingId(null);
+        showSuccess("Updated!", "Feedback updated.");
       } else {
-        showError("Error", "Failed to update feedback.")
+        showError("Error", "Failed to update.");
       }
     } catch (error) {
-      console.error("Update error:", error)
-      showError("Error", "An unexpected error occurred.")
+      showError("Error", "Unexpected error.");
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   return (
     <Card className="p-6">
-      <h2 className="text-2xl font-bold mb-6">Customer Feedback</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Customer Feedback</h2>
+      </div>
+
       <div className="space-y-4">
-        {loading ? <p>Loading feedback...</p> : feedbacks.map((feedback) => (
-          <div key={feedback._id} className="p-4 border border-border rounded-lg transition-all hover:bg-accent/5">
-            
-            {editingId === feedback._id ? (
-              // Edit UI (Same as before)
-              <div className="space-y-3">
-                 {/* ... Inputs ... */}
-                 {/* (Copy your inputs from previous code here) */}
+        {loading ? (
+          <div className="flex justify-center p-8">
+            <Loader2 className="animate-spin" />
+          </div>
+        ) : feedbacks.length === 0 ? (
+          <div className="text-center text-muted-foreground p-8">
+            No feedback found.
+          </div>
+        ) : (
+          feedbacks.map((feedback) => (
+            <div
+              key={feedback._id}
+              className="p-4 border border-border rounded-lg transition-all hover:bg-accent/5"
+            >
+              {editingId === feedback._id ? (
+                // EDIT MODE (Same as before)
+                <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-4">
-                  <Input 
-                    value={editForm.name || ""} 
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} 
-                    placeholder="Name"
-                  />
-                  <Input 
-                    value={editForm.email || ""} 
-                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} 
-                    placeholder="Email"
-                  />
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">Rating:</span>
-                  <div className="flex gap-1 cursor-pointer">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className={`w-5 h-5 cursor-pointer ${
-                          star <= (editForm.rating || 0) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
-                        }`}
-                        onClick={() => setEditForm({ ...editForm, rating: star })}
-                      />
-                    ))}
+                    <Input
+                      value={editForm.name || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, name: e.target.value })
+                      }
+                      placeholder="Name"
+                    />
+                    <Input
+                      value={editForm.email || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, email: e.target.value })
+                      }
+                      placeholder="Email"
+                    />
                   </div>
-                </div>
-
-                <Textarea 
-                  value={editForm.message || ""} 
-                  onChange={(e) => setEditForm({ ...editForm, message: e.target.value })} 
-                  placeholder="Feedback message"
-                />
-
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" size="sm" onClick={cancelEditing} disabled={isSaving}>
-                    <X className="w-4 h-4 mr-1" /> Cancel
-                  </Button>
-                  <Button size="sm" onClick={handleSave} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
-                    Save
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              // View UI
-              <>
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <span className="font-semibold">{feedback.name}</span>
-                    <span className="text-sm text-muted-foreground ml-2">({feedback.email})</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <div className="flex gap-1">
-                      {[...Array(5)].map((_, i) => (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Rating:</span>
+                    <div className="flex gap-1 cursor-pointer">
+                      {[1, 2, 3, 4, 5].map((star) => (
                         <Star
-                          key={i}
-                          className={`w-4 h-4 ${
-                            i < feedback.rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
-                          }`}
+                          key={star}
+                          className={`w-5 h-5 cursor-pointer ${star <= (editForm.rating || 0) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`}
+                          onClick={() =>
+                            setEditForm({ ...editForm, rating: star })
+                          }
                         />
                       ))}
                     </div>
-
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => startEditing(feedback)}>
-                        <Edit2 className="w-4 h-4 text-blue-500" />
-                      </Button>
-                      {/* 4. Update the onClick to call handleDeleteClick */}
-                      <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(feedback._id)}>
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </Button>
-                    </div>
+                  </div>
+                  <Textarea
+                    value={editForm.message || ""}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, message: e.target.value })
+                    }
+                    placeholder="Feedback message"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={cancelEditing}
+                      disabled={isSaving}
+                    >
+                      <X className="w-4 h-4 mr-1" /> Cancel
+                    </Button>
+                    <Button size="sm" onClick={handleSave} disabled={isSaving}>
+                      {isSaving ? (
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-1" />
+                      )}{" "}
+                      Save
+                    </Button>
                   </div>
                 </div>
-
-                <p className="text-sm text-foreground mb-2">{feedback.message}</p>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(feedback.createdAt).toLocaleString()}
-                </span>
-              </>
-            )}
-          </div>
-        ))}
+              ) : (
+                // VIEW MODE
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <span className="font-semibold">{feedback.name}</span>
+                      <span className="text-sm text-muted-foreground ml-2">
+                        ({feedback.email})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex gap-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-4 h-4 ${i < feedback.rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`}
+                          />
+                        ))}
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => startEditing(feedback)}
+                        >
+                          <Edit2 className="w-4 h-4 text-blue-500" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteClick(feedback._id)}
+                        >
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm text-foreground mb-2">
+                    {feedback.message}
+                  </p>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(feedback.createdAt).toLocaleString()}
+                  </span>
+                </>
+              )}
+            </div>
+          ))
+        )}
       </div>
+
+      {/* --- PAGINATION CONTROLS --- */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-4 py-4 mt-6 border-t">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+          </Button>
+
+          <span className="text-sm font-medium text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </span>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+            }
+            disabled={currentPage === totalPages}
+          >
+            Next <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
+        </div>
+      )}
     </Card>
-  )
+  );
 }

@@ -1,55 +1,76 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/mongodb"
 
-// GET: Fetch all items
+export const dynamic = "force-dynamic"
+
 export async function GET(request: NextRequest) {
   try {
-    const client = await clientPromise
-    if (!client) throw new Error("Database connection failed")
-    const db = client.db("intellicafe")
-
     const { searchParams } = new URL(request.url)
     const category = searchParams.get("category")
+    const pageParam = searchParams.get("page")
 
-    // --- ADJUSTMENT HERE ---
-    // Use Regex for Case-Insensitive matching ($options: 'i')
-    // This allows "coffee" to match "Coffee", "COFFEE", etc.
-    const query = category && category !== "all" 
-      ? { category: { $regex: new RegExp(`^${category}$`, "i") } } 
-      : {}
+    const client = await clientPromise
+    if (!client) throw new Error("Database connection failed")
 
-    const items = await db.collection("menu_items").find(query).toArray()
+    const db = client.db("intellicafe")
 
-    return NextResponse.json(items)
+    // --- MODE 1: CUSTOMER MENU (No pagination, filter by category) ---
+    if (category) {
+      const query: any = { available: true }
+
+      if (category !== "all") {
+        // Case-insensitive category match
+        query.category = { $regex: new RegExp(`^${category}$`, "i") }
+      }
+
+      // USE "menu_items" COLLECTION
+      const items = await db.collection("menu_items")
+        .find(query)
+        .sort({ name: 1 })
+        .toArray()
+
+      return NextResponse.json(items) // Returns simple Array []
+    }
+
+    // --- MODE 2: ADMIN DASHBOARD (With Pagination) ---
+    const page = parseInt(pageParam || "1")
+    const limit = parseInt(searchParams.get("limit") || "10")
+    const skip = (page - 1) * limit
+
+    // USE "menu_items" COLLECTION
+    const items = await db.collection("menu_items")
+      .find({})
+      .sort({ category: 1, name: 1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray()
+
+    const totalItems = await db.collection("menu_items").countDocuments()
+
+    return NextResponse.json({
+      items,
+      currentPage: page,
+      totalPages: Math.ceil(totalItems / limit),
+      totalItems
+    })
+
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch items" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to fetch menu" }, { status: 500 })
   }
 }
 
-// POST: Create a new item
 export async function POST(request: NextRequest) {
   try {
+    const body = await request.json()
     const client = await clientPromise
     if (!client) throw new Error("Database connection failed")
+
     const db = client.db("intellicafe")
 
-    const body = await request.json()
-    
-    // Basic validation
-    if (!body.name || !body.price) {
-        return NextResponse.json({ error: "Missing name or price" }, { status: 400 })
-    }
+    // Save to "menu_items"
+    const result = await db.collection("menu_items").insertOne(body)
 
-    const newItem = {
-      ...body,
-      price: parseFloat(body.price),
-      available: true,
-      createdAt: new Date(),
-    }
-
-    const result = await db.collection("menu_items").insertOne(newItem)
-
-    return NextResponse.json({ success: true, id: result.insertedId }, { status: 201 })
+    return NextResponse.json({ success: true, id: result.insertedId })
   } catch (error) {
     return NextResponse.json({ error: "Failed to create item" }, { status: 500 })
   }

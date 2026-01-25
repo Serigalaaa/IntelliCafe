@@ -4,68 +4,79 @@ import { ObjectId } from "mongodb"
 
 export const dynamic = "force-dynamic"
 
-// 1. GET: Fetch all vouchers (Used by Admin Dashboard)
+// 1. GET: Fetch all vouchers (Paginated)
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get("page") || "1")
+    const limit = parseInt(searchParams.get("limit") || "10")
+    const skip = (page - 1) * limit
+
     const client = await clientPromise
     if (!client) throw new Error("Database connection failed")
     const db = client.db("intellicafe")
 
-    // Fetch all vouchers, newest first
+    // Fetch paginated vouchers
     const vouchers = await db.collection("vouchers")
       .find({})
       .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .toArray()
 
-    return NextResponse.json(vouchers)
+    // Get total count
+    const totalVouchers = await db.collection("vouchers").countDocuments()
+
+    return NextResponse.json({
+      vouchers,
+      currentPage: page,
+      totalPages: Math.ceil(totalVouchers / limit),
+      totalVouchers
+    })
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch vouchers" }, { status: 500 })
   }
 }
 
-// 2. POST: Create a new Voucher (Used by Admin Dashboard)
+// 2. POST: Create a new Voucher (Unchanged)
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { code, type, value, limitType, description } = body
 
-    // Basic Validation
     if (!code || !type || !value) {
-      return NextResponse.json({ error: "Missing required fields (code, type, value)" }, { status: 400 })
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
     const client = await clientPromise
     if (!client) throw new Error("Database connection failed")
     const db = client.db("intellicafe")
 
-    // Check if code already exists (Prevent Duplicates)
     const existing = await db.collection("vouchers").findOne({ code: code.toUpperCase() })
     if (existing) {
       return NextResponse.json({ error: "Voucher code already exists" }, { status: 400 })
     }
 
-    // Create the Voucher Object
     const newVoucher = {
       code: code.toUpperCase(),
-      type,       // 'percentage' or 'fixed'
+      type,
       value: Number(value),
-      limitType,  // 'daily', 'once', 'unlimited'
+      limitType,
       isActive: true,
       description: description || "",
       createdAt: new Date(),
-      usageCount: 0 // Track how many times it's been used globally
+      usageCount: 0
     }
 
     await db.collection("vouchers").insertOne(newVoucher)
 
     return NextResponse.json({ success: true, voucher: newVoucher })
   } catch (error) {
-    console.error("Create Voucher Error:", error)
     return NextResponse.json({ error: "Failed to create voucher" }, { status: 500 })
   }
 }
 
-// 3. DELETE: Remove a Voucher (Used by Admin Dashboard)
+// 3. DELETE: Remove a Voucher (Unchanged)
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
