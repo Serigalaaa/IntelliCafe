@@ -48,7 +48,7 @@ export function HeroSection() {
   return (
     <section className="relative min-h-screen w-full flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 z-0">
-        <img src="/modern-cozy-cafe-interior-with-warm-lighting-coffe.jpg" alt="Café background" className="w-full h-full object-cover" />
+        <img src="/JuwitaKopiHomePage.png" alt="Café background" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-black/60" />
       </div>
 

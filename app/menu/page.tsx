@@ -11,11 +11,12 @@ export default function MenuPage() {
 
   const categories = [
     { id: "all", label: "All Items" },
-    { id: "coffee", label: "Coffee" },
-    { id: "tea", label: "Tea" },
-    { id: "pastry", label: "Pastries" },
-    { id: "sandwich", label: "Sandwiches" },
-    { id: "dessert", label: "Desserts" },
+    { id: "coffee", label: "Coffee & Drinks" },
+    { id: "mains", label: "Mains" },
+    { id: "sides", label: "Sides" },
+    { id: "desserts", label: "Desserts" },
+    { id: "entree", label: "Entree" },
+    { id: "add-on", label: "Add-On" },
   ]
 
   return (

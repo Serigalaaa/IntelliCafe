@@ -14,7 +14,7 @@ export interface MenuItem {
   name: string
   description: string
   price: number
-  category: "coffee" | "tea" | "pastry" | "sandwich" | "dessert"
+  category: "coffee" | "mains" | "sides" | "desserts" | "entree" | "add-on"
   image: string
   available: boolean
 }

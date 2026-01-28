@@ -24,9 +24,20 @@ export function FeedbackList() {
     try {
       const response = await fetch("/api/feedback")
       const data = await response.json()
-      setFeedbacks(data)
+      
+      // <<-- CHANGED: Added validation to ensure 'data' is an array before setting state
+      if (Array.isArray(data)) {
+        setFeedbacks(data)
+      } else if (data && typeof data === 'object' && Array.isArray(data.feedbacks)) {
+        // <<-- CHANGED: Handles cases where the API returns { feedbacks: [...] }
+        setFeedbacks(data.feedbacks)
+      } else {
+        console.error("API did not return an array:", data)
+        setFeedbacks([]) // <<-- CHANGED: Fallback to empty array to prevent map error
+      }
     } catch (error) {
       console.error("Failed to fetch feedbacks:", error)
+      setFeedbacks([]) // <<-- CHANGED: Ensure state remains an array even on fetch failure
     } finally {
       setLoading(false)
     }
@@ -52,7 +63,8 @@ export function FeedbackList() {
     <Card className="p-6">
       <h2 className="text-2xl font-bold text-foreground mb-6">Recent Feedback</h2>
       <div className="space-y-4 max-h-[600px] overflow-y-auto">
-        {feedbacks.map((feedback) => (
+        {/* <<-- CHANGED: Added '?.' (Optional Chaining) to map to prevent 'not a function' crash */}
+        {feedbacks?.map((feedback) => (
           <div key={feedback._id} className="border-b border-border pb-4 last:border-0">
             <div className="flex items-center justify-between mb-2">
               <span className="font-semibold text-foreground">{feedback.name}</span>
@@ -69,10 +81,16 @@ export function FeedbackList() {
             </div>
             <p className="text-sm text-muted-foreground">{feedback.message}</p>
             <span className="text-xs text-muted-foreground mt-2 block">
-              {new Date(feedback.createdAt).toLocaleDateString()}
+              {/* <<-- CHANGED: Added check for valid date to prevent 'Invalid Date' errors */}
+              {feedback.createdAt ? new Date(feedback.createdAt).toLocaleDateString() : 'No date'}
             </span>
           </div>
         ))}
+        
+        {/* <<-- ADDED: User-friendly message if no feedback is found */}
+        {feedbacks.length === 0 && (
+          <p className="text-center text-muted-foreground py-4">No feedback yet.</p>
+        )}
       </div>
     </Card>
   )

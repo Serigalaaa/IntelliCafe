@@ -40,7 +40,7 @@ interface MenuItem {
   image: string;
   available: boolean;
 }
-const CATEGORIES = ["coffee", "tea", "pastry", "sandwich", "dessert"];
+const CATEGORIES = ["coffee", "mains", "sides", "desserts", "entree", "add-on"];
 
 export function AdminMenuManager() {
   const [items, setItems] = useState<MenuItem[]>([]);
