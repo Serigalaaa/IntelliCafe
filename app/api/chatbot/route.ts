@@ -14,32 +14,36 @@ export async function POST(request: NextRequest) {
       
       YOUR KNOWLEDGE BASE:
 
-      1. SPECIFIC STORE INFO:
-         - **Name:** Juwita Kopi
-         - **Favorites:** Juwita Signature Latte, Nasi Lemak Special, Hazelnut Croissant.
-         - **Hours:** Mon-Sat 5pm-11pm (Closed Sundays).
-         - **Location:** Juwita Kopi, Sutera Square, Masjid, Taman Sutera, 43000 Kajang, Selangor.
-         - **Owner:** Miss Farhana (Started 2023).
-         - **Contact:** +6019-373-0446 | hello@juwitakopi.com
+      1. COFFEE & DRINKS (Prices Hot/Cold in RM):
+         - Basic: Americano (6/7), Latte (8/9).
+         - Flavoured Latte: Caramel Macchiato (11/12), Vanilla/Hazelnut/Spanish Latte (11/12), Mocha (12/13), Tiramisu Latte (16).
+         - Greeny (Matcha): Matcha (11/12), Strawberry/Mango/Blueberry/Banana Matcha (14), Buttercream Sea-Salt Matcha (16).
+         - General Coffee Info: Lattes are milky/smooth; Cappuccinos are frothy; Americanos are espresso with water; Mochas include chocolate.
 
-      2. GENERAL COFFEE KNOWLEDGE (Use this to answer general questions):
-         - **Latte vs Cappuccino:** A Latte is milky and smooth (more steamed milk); a Cappuccino is frothy and stronger (more foam).
-         - **Flat White:** Similar to a latte but with less milk foam and a stronger coffee hit (microfoam).
-         - **Americano:** Espresso shots topped with hot water.
-         - **Mocha:** A latte mixed with chocolate powder/syrup.
-         - **Espresso:** A concentrated shot of coffee, the base for most drinks.
-         - **Cold Brew:** Coffee steeped in cold water for 12+ hours (smooth, less acidic).
-         - **Roast Levels:** Light (acidic/fruity), Medium (balanced), Dark (bitter/bold).
+      2. FOOD & DESCRIPTIONS (Prices in RM):
+         - Entree: Roti Bakar Kaya/Butter (2.50) - Classic toasted bread with coconut jam or butter.
+         - Spaghetti Mains: 
+            * Chicken Buttermilk (12): Creamy, rich, and slightly spicy sauce with tender chicken.
+            * Creamy Tomyam Seafood (16): A fusion of spicy/sour Tomyam with a creamy pasta base.
+            * Chicken Alfredo (14): Classic white creamy sauce.
+            * Marry Me Pasta (15): A rich, sun-dried tomato cream sauce.
+            * Pesto Pasta (16): Fragrant basil and nut-based green sauce.
+         - Other Mains: Cheesy Chicken Chop (18), Fish N Chip (16), Mac N Cheese (16).
+         - Sides: Popia Big Mac (10), Korean Spicy Chicken (14/18), Mantou with Chilli Butter Clam (12).
 
-      3. FOOD PAIRING KNOWLEDGE:
-         - **Sweet Pastries (Croissants/Danishes):** Go best with Cappuccinos or Lattes.
-         - **Savory Food (Sandwiches/Nasi Lemak):** Goes best with Americano, Teh O (Black Tea), or Iced Lemon Tea to cut the richness.
-         - **Desserts (Cakes):** Go best with Long Black or Espresso to balance the sweetness.
+      3. FOOD PAIRING & RECOMMENDATIONS:
+         - Pair spicy food (Tomyam/Korean Chicken) with "Greeny" Matcha or Iced Lemon Tea to balance the heat.
+         - Pair creamy pasta (Alfredo/Buttermilk) with an Americano or Black Coffee to cut through the richness.
+         - Pair sweet Roti Bakar with a hot Latte or Kopi Kampung.
+
+      4. STORE INFO:
+         - Location: Sutera Square, Kajang.
+         - Hours: Mon-Sat 5pm-11pm.
+         - Owner: Miss Farhana.
 
       GUIDELINES:
-      - Be friendly, concise (under 100 words).
-      - If the user asks for a recommendation, try to link a General Fact to a Store Item (e.g., "If you like frothy coffee, try our Cappuccino! It goes great with a croissant.").
-      `,
+      - When asked "what is [food item]", explain the taste profile based on the descriptions above.
+      - Be friendly, professional, and keep answers under 100 words.`,
       prompt: message,
     })
 
@@ -47,25 +51,18 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[v0] Chatbot error:", error)
 
-    // FALLBACK RESPONSES (Used if AI is down)
     const lowerMessage = message.toLowerCase()
-    let response = "I'm here to help! You can ask me about our menu, favorites, owner, or contact info."
+    let response = "I'm here to help! Ask me about our menu, like our signature Chicken Buttermilk Spaghetti or our Greeny Matcha series."
 
-    if (lowerMessage.includes("menu")) {
-      response = "Our menu includes premium coffee, fresh pastries, sandwiches, and delicious desserts."
-    } else if (lowerMessage.includes("favourite") || lowerMessage.includes("favorite") || lowerMessage.includes("recommend")) {
-      response = "Our customer favorites are the Juwita Signature Latte and Nasi Lemak Special."
-    } else if (lowerMessage.includes("owner") || lowerMessage.includes("about")) {
-      response = "Juwita Kopi is owned by Miss Farhana. We started in 2023 to serve the best coffee in Kajang."
-    } else if (lowerMessage.includes("contact") || lowerMessage.includes("call")) {
-      response = "You can contact us at +6019-373-0446."
-    } else if (lowerMessage.includes("latte") || lowerMessage.includes("cappuccino") || lowerMessage.includes("flat white")) {
-      // Basic fallback for coffee knowledge
-      response = "Great question! A Latte is milky, a Cappuccino is frothy, and a Flat White is strong and smooth. We serve all three!"
-    } else if (lowerMessage.includes("hour") || lowerMessage.includes("open")) {
-      response = "We're open Monday-Saturday 5pm-11pm, and closed on Sundays."
-    } else if (lowerMessage.includes("location") || lowerMessage.includes("where")) {
-      response = "We're located at Sutera Square, Taman Sutera, 43000 Kajang, Selangor."
+    // Comprehensive Fallback Logic
+    if (lowerMessage.includes("buttermilk")) {
+      response = "Our Chicken Buttermilk Spaghetti (RM12) is a fan favorite! It features a rich, creamy, and slightly spicy sauce that pairs perfectly with a fresh Matcha."
+    } else if (lowerMessage.includes("tomyam")) {
+      response = "Our Creamy Tomyam Seafood Spaghetti (RM16) is a spicy-sour fusion dish. It's great if you want something with a kick!"
+    } else if (lowerMessage.includes("matcha") || lowerMessage.includes("greeny")) {
+      response = "We have a wide range of 'Greeny' Matcha drinks, including our specialty Buttercream Sea-Salt Matcha (RM16)."
+    } else if (lowerMessage.includes("roti bakar")) {
+      response = "We serve classic Roti Bakar (RM2.50) and a special set with Kopi Kampung for only RM4.50!"
     }
 
     return NextResponse.json({ response })
