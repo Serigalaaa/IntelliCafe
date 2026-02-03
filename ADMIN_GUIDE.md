@@ -1,67 +1,78 @@
 # IntelliCafe Admin Guide
 
-## Changing User Credentials
+## User Management Overview
 
-### How to Add/Edit Users and Passwords
+The IntelliCafe system uses a database-driven user management approach. User accounts are handled dynamically using MongoDB and API routes. There is no need to manually edit source files to create or update users.
 
-**File to edit:** `lib/auth.ts`
+---
 
-### Adding a New User
+## Adding Users
 
-1. Open `lib/auth.ts`
-2. Find the `users` array (around line 14)
-3. Add a new user object:
+### Method 1: Sign Up via Website (Recommended)
 
-```typescript
-{
-  id: "3",  // Increment the ID
-  email: "yourname@example.com",
-  name: "Your Name",
-  role: "customer",  // or "admin"
-  createdAt: new Date(),
-}
-```
+1. Open the IntelliCafe website
+2. Click **Sign Up**
+3. Enter:
+   - Name
+   - Email
+   - Phone number
+   - Password
+4. The user account will be automatically stored in MongoDB
 
-### Changing Passwords
+Passwords are securely hashed using bcrypt before being saved.
 
-1. Find the `passwords` object (around line 28)
-2. Add or modify the password:
+---
 
-```typescript
-const passwords: Record<string, string> = {
-  "admin@intellicafe.com": "newadminpass",  // Change admin password
-  "customer@example.com": "newcustomerpass",  // Change customer password
-  "yourname@example.com": "yourpassword",  // Add new user password
-}
-```
+## Admin Account
 
-### Default Credentials
+### Default Admin (Seeded Automatically)
 
-**Admin Account:**
-- Email: `admin@intellicafe.com`
+When the server starts and MongoDB is connected for the first time, a default admin account is created automatically.
+
+**Admin Credentials**
+- Email: `admin@admin.com`
 - Password: `admin123`
-- Role: admin (full access)
+- Role: Admin
 
-**Customer Account:**
-- Email: `customer@example.com`
-- Password: `password123`
-- Role: customer
+> ⚠️ This account is for development and demonstration purposes only.
 
-### Important Notes
+---
 
-- This is a demo system using simulated data
-- For production, passwords should be hashed with bcrypt
-- When MongoDB is connected, users will be stored in the database
-- Guest mode doesn't require credentials
+## Editing or Managing Users
 
-## Café Location
+Users can be managed through:
+- MongoDB Compass (manual editing)
+- Admin dashboard (if enabled)
 
-The café location has been set to:
-**Juwita Kopi, Sutera Square, Masjid, Taman Sutera, 43000 Kajang, Selangor**
+To edit users manually:
+1. Open **MongoDB Compass**
+2. Select database: `intellicafe`
+3. Open collection: `users`
+4. Modify user details such as role or email
 
-This information is now:
-- Displayed under the chatbot interface
-- Included in the AI chatbot's knowledge base
-- Available as a fallback response
+---
 
-Customers can ask the chatbot about the location and get directions via Google Maps.
+## Guest Mode
+
+Guest mode allows users to access the system without registering.
+
+Guest users can:
+- Browse menu
+- Play games
+- Use chatbot
+- Submit feedback
+
+Guest users cannot:
+- Access admin dashboard
+- Perform administrative actions
+
+---
+
+## Café Location Information
+
+Café location configured in the system:
+
+**JuwitaKopi**  
+Sutera Square, Kajang, Selangor
+
+This information is available through the chatbot when users ask about café location or directions.
