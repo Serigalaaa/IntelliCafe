@@ -1,8 +1,8 @@
 "use client"
 
 import { Card, CardContent } from "@/components/ui/card"
-import { Menu, MessageSquare, ThumbsUp } from "lucide-react"
-import Link from "next/link" // 1. Import Link
+import { Menu, MessageSquare, ThumbsUp, Gamepad2 } from "lucide-react"
+import Link from "next/link"
 
 export function AboutSection() {
   const features = [
@@ -10,22 +10,29 @@ export function AboutSection() {
       icon: Menu,
       title: "Smart Menu",
       description:
-        "Browse our intelligent menu system with real-time availability, personalized recommendations, and detailed nutritional information.",
-      href: "/menu", // 2. Add destination
+        "Explore our intelligent digital menu with smart filtering, real-time availability, and clear descriptions to help customers make informed choices.",
+      href: "/menu",
     },
     {
       icon: MessageSquare,
-      title: "Chatbot Assistant",
+      title: "AI Chatbot Assistant",
       description:
-        "Get instant help from our AI-powered chatbot. Ask questions, place orders, and receive personalized suggestions 24/7.",
-      href: "/chatbot", // 2. Add destination
+        "Interact with our intelligent chatbot to ask about menu items, receive food and drink recommendations, and get café information instantly.",
+      href: "/chatbot",
     },
     {
       icon: ThumbsUp,
-      title: "Feedback Icons",
+      title: "Interactive Feedback System",
       description:
-        "Share your experience with our interactive feedback system. Your opinions help us serve you better every day.",
-      href: "/feedback", // 2. Add destination
+        "Share your dining experience using sentiment-based feedback icons. Customer feedback helps improve service quality and user experience.",
+      href: "/feedback",
+    },
+    {
+      icon: Gamepad2,
+      title: "Gamified Experience & Rewards",
+      description:
+        "Logged-in users can play our interactive food categorization game to enhance engagement. Successful gameplay allows users to earn discounted vouchers and special café rewards.",
+      href: "/game",
     },
   ]
 
@@ -43,10 +50,9 @@ export function AboutSection() {
           </p>
         </div>
 
-        {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Features Grid - Set to 4 columns on large screens */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {features.map((feature, index) => (
-            // 3. Wrap the Card in a Link
             <Link key={index} href={feature.href} className="block h-full">
               <Card
                 className="h-full border-border bg-card hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group cursor-pointer"
