@@ -7,13 +7,20 @@ import { User } from "@/lib/db-models"
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Get phone from request body
     const { email, password, name, phone } = await request.json()
 
-    // 2. Validate phone is present
     if (!email || !password || !name || !phone) {
       return NextResponse.json({ error: "Name, email, phone, and password are required" }, { status: 400 })
     }
+
+    // --- UPDATED: Validate Email Format ---
+    // Allows: example.com, example.com.my, example.my
+    const emailRegex = /^[^\s@]+@[^\s@]+\.(com|com\.my|my)$/i;
+    
+    if (!emailRegex.test(email)) {
+        return NextResponse.json({ error: "Email must end in .com, .my, or .com.my" }, { status: 400 })
+    }
+    // ----------------------------------
 
     const client = await clientPromise
     if (!client) {
@@ -21,7 +28,6 @@ export async function POST(request: NextRequest) {
     }
     const db = client.db("intellicafe") 
 
-    // 3. Check for Existing User (Email OR Phone)
     const existingUser = await db.collection<User>("users").findOne({
         $or: [
             { email: email },
@@ -29,7 +35,6 @@ export async function POST(request: NextRequest) {
         ]
     })
     
-    // 4. Specific error messages
     if (existingUser) {
       if (existingUser.email === email) {
           return NextResponse.json({ error: "User with this email already exists" }, { status: 400 })
@@ -41,11 +46,10 @@ export async function POST(request: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // 5. Create user with phone
     const newUser: User = {
       email,
       name,
-      phone, // Add phone here
+      phone,
       password: hashedPassword,
       role: "user", 
       createdAt: new Date(),

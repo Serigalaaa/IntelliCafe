@@ -1,11 +1,15 @@
-import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 
 export async function POST() {
-    const cookieStore = await cookies()
-
+  try {
+    const cookieStore = await cookies();
+    
     // Delete the guest session cookie
-    cookieStore.delete("guest_session_id")
-
-    return NextResponse.json({ success: true })
+    cookieStore.delete("guest_id");
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to reset guest session" }, { status: 500 });
+  }
 }

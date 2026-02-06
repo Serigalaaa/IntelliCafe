@@ -38,12 +38,27 @@ export function HeroSection() {
 
   const handleLogin = () => { setAuthModalTab("login"); setAuthModalOpen(true) }
   const handleSignup = () => { setAuthModalTab("signup"); setAuthModalOpen(true) }
+  
+  // --- FIX STARTS HERE ---
   const handleGuest = async () => {
     try {
+      // 1. Set the Cookie (Server Side)
       const response = await fetch("/api/auth/guest", { method: "POST" })
-      if (response.ok) window.location.href = "/menu"
-    } catch (error) { console.error("Guest login error:", error) }
+      
+      if (response.ok) {
+          // 2. Set the Flag (Client Side) - CRITICAL FOR UI
+          if (typeof window !== "undefined") {
+              localStorage.setItem("guest_mode", "true")
+          }
+          
+          // 3. Redirect
+          window.location.href = "/menu"
+      }
+    } catch (error) { 
+        console.error("Guest login error:", error) 
+    }
   }
+  // --- FIX ENDS HERE ---
 
   return (
     <section className="relative min-h-screen w-full flex items-center justify-center overflow-hidden">
