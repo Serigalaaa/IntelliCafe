@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Coffee, LogOut, UserIcon, UserCircle, AlertTriangle } from "lucide-react";
-import { useState, useEffect } from "react"; // Added useEffect
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,26 +24,28 @@ import {
 import { CartSidebar } from "@/components/cart-sidebar";
 import { ReceiptButton } from "@/components/receipt-button";
 import { useCartStore } from "@/lib/cart-store";
+import { AuthModal } from "@/components/auth-modal"; // Import AuthModal
 
 export function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   
-  // --- NEW: Track Guest Mode Flag ---
+  // --- NEW: Auth Modal State ---
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authTab, setAuthTab] = useState<"login" | "signup">("login");
+
   const [isGuestMode, setIsGuestMode] = useState(false);
 
   const { user, isAuthenticated, logout } = useAuth();
   const { items, clearOrderHistory, clearCart } = useCartStore();
 
-  // Check Local Storage on mount to see if Guest Mode is active
   useEffect(() => {
     if (typeof window !== "undefined") {
         const isGuest = localStorage.getItem("guest_mode") === "true";
         setIsGuestMode(isGuest);
     }
-  }, []); // Run once on mount
+  }, []);
 
-  // Sync with items: If items exist + not auth, we are definitely guest
   useEffect(() => {
     if (!isAuthenticated && items.length > 0) {
         setIsGuestMode(true);
@@ -51,10 +53,8 @@ export function Navigation() {
     }
   }, [items.length, isAuthenticated]);
   
-  // LOGIC: Guest if (NOT Logged In) AND (Flag is True OR Items exist)
   const isGuest = !isAuthenticated && (isGuestMode || items.length > 0);
 
-  // --- LOGOUT (Logged In Users) ---
   const handleLogout = async () => {
     clearCart();
     clearOrderHistory();
@@ -63,27 +63,24 @@ export function Navigation() {
     window.location.href = "/";
   };
 
-  // --- EXIT GUEST MODE (Anonymous Users) ---
   const handleGuestExit = async () => {
-    // 1. Clear Data
     clearCart();
     clearOrderHistory();
     setShowExitConfirm(false);
     setIsOpen(false);
-    
-    // 2. Remove UI Flag (IMPORTANT)
     localStorage.removeItem("guest_mode");
     setIsGuestMode(false);
-
-    // 3. Call API to remove cookie
     try {
         await fetch("/api/auth/reset-guest", { method: "POST" });
-    } catch (e) {
-        console.error("Failed to reset guest");
-    }
-
-    // 4. Reload to reset state
+    } catch (e) { console.error(e); }
     window.location.reload();
+  };
+
+  // Helper to open login modal
+  const openLogin = () => {
+    setAuthTab("login");
+    setAuthModalOpen(true);
+    setIsOpen(false); // Close mobile menu if open
   };
 
   const baseItems = [
@@ -135,7 +132,6 @@ export function Navigation() {
                 <CartSidebar />
 
                 {isAuthenticated && user ? (
-                  // LOGGED IN USER UI
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm" className="gap-2 ml-2">
@@ -160,7 +156,6 @@ export function Navigation() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : isGuest ? (
-                  // GUEST USER UI (Matches User Style)
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm" className="gap-2 ml-2">
@@ -188,9 +183,9 @@ export function Navigation() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : (
-                  // DEFAULT LOGIN BUTTON
-                   <Button asChild variant="default" size="sm" className="ml-2">
-                      <Link href="/auth">Login</Link>
+                  // --- UPDATED: OPEN MODAL INSTEAD OF LINK ---
+                   <Button onClick={openLogin} variant="default" size="sm" className="ml-2">
+                      Login
                    </Button>
                 )}
               </div>
@@ -244,15 +239,19 @@ export function Navigation() {
                        </button>
                     </>
                  ) : (
-                    <Link href="/auth" className="block w-full text-center py-2 bg-primary text-primary-foreground rounded-md font-medium" onClick={() => setIsOpen(false)}>
+                    // --- UPDATED MOBILE BUTTON ---
+                    <Button onClick={openLogin} className="w-full" variant="default">
                        Login / Sign Up
-                    </Link>
+                    </Button>
                  )}
               </div>
             </div>
           )}
         </div>
       </nav>
+
+      {/* --- AUTH MODAL --- */}
+      <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} defaultTab={authTab} />
 
       {/* --- EXIT CONFIRMATION DIALOG --- */}
       <Dialog open={showExitConfirm} onOpenChange={setShowExitConfirm}>
@@ -264,7 +263,6 @@ export function Navigation() {
                 <DialogTitle>Exit Guest Mode?</DialogTitle>
                 <DialogDescription className="pt-2">
                     This will clear your current cart and remove your temporary session. 
-                    <br/><span className="font-semibold text-foreground">This action cannot be undone.</span>
                 </DialogDescription>
             </DialogHeader>
             <DialogFooter className="flex gap-2 sm:justify-center mt-4 w-full">

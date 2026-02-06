@@ -6,6 +6,7 @@ import { LogIn, UserPlus, Users, Coffee, ArrowRight } from "lucide-react"
 import { AuthModal } from "@/components/auth-modal"
 import { useAuth } from "@/hooks/use-auth"
 import Link from "next/link"
+import { useCartStore } from "@/lib/cart-store" // Import Cart Store
 
 export function HeroSection() {
   const [greeting, setGreeting] = useState("")
@@ -14,6 +15,26 @@ export function HeroSection() {
   const [authModalTab, setAuthModalTab] = useState<"login" | "signup">("login")
 
   const { isAuthenticated, user } = useAuth()
+  const { clearCart } = useCartStore()
+
+  // --- NEW: AUTO-RESET SESSION ON HOME PAGE LOAD ---
+  useEffect(() => {
+    // If user is NOT authenticated, assume fresh visit and reset Guest Mode
+    if (!isAuthenticated) {
+        if (typeof window !== "undefined") {
+            // 1. Remove UI Flag
+            localStorage.removeItem("guest_mode")
+            
+            // 2. Clear Cart (Optional: Remove if you want to persist cart across refreshes)
+            // clearCart() 
+        }
+
+        // 3. Reset Server Cookie (Silently)
+        fetch("/api/auth/reset-guest", { method: "POST" })
+            .catch(err => console.error("Silent guest reset failed", err))
+    }
+  }, [isAuthenticated, clearCart]) 
+  // ------------------------------------------------
 
   useEffect(() => {
     const updateGreeting = () => {
@@ -39,26 +60,19 @@ export function HeroSection() {
   const handleLogin = () => { setAuthModalTab("login"); setAuthModalOpen(true) }
   const handleSignup = () => { setAuthModalTab("signup"); setAuthModalOpen(true) }
   
-  // --- FIX STARTS HERE ---
   const handleGuest = async () => {
     try {
-      // 1. Set the Cookie (Server Side)
       const response = await fetch("/api/auth/guest", { method: "POST" })
-      
       if (response.ok) {
-          // 2. Set the Flag (Client Side) - CRITICAL FOR UI
           if (typeof window !== "undefined") {
               localStorage.setItem("guest_mode", "true")
           }
-          
-          // 3. Redirect
           window.location.href = "/menu"
       }
     } catch (error) { 
         console.error("Guest login error:", error) 
     }
   }
-  // --- FIX ENDS HERE ---
 
   return (
     <section className="relative min-h-screen w-full flex items-center justify-center overflow-hidden">
