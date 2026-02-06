@@ -24,13 +24,13 @@ import {
 import { CartSidebar } from "@/components/cart-sidebar";
 import { ReceiptButton } from "@/components/receipt-button";
 import { useCartStore } from "@/lib/cart-store";
-import { AuthModal } from "@/components/auth-modal"; // Import AuthModal
+import { AuthModal } from "@/components/auth-modal";
+import { useSearchParams } from "next/navigation"; // Added import
 
 export function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   
-  // --- NEW: Auth Modal State ---
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authTab, setAuthTab] = useState<"login" | "signup">("login");
 
@@ -38,6 +38,20 @@ export function Navigation() {
 
   const { user, isAuthenticated, logout } = useAuth();
   const { items, clearOrderHistory, clearCart } = useCartStore();
+  const searchParams = useSearchParams(); // Get URL params
+
+  // --- NEW: Check for redirect trigger ---
+  useEffect(() => {
+    if (searchParams.get("openLogin") === "true") {
+        setAuthModalOpen(true);
+        setAuthTab("login");
+        
+        // Clean URL to prevent loop/refresh issues
+        const url = new URL(window.location.href);
+        url.searchParams.delete("openLogin");
+        window.history.replaceState({}, "", url);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -76,11 +90,10 @@ export function Navigation() {
     window.location.reload();
   };
 
-  // Helper to open login modal
   const openLogin = () => {
     setAuthTab("login");
     setAuthModalOpen(true);
-    setIsOpen(false); // Close mobile menu if open
+    setIsOpen(false);
   };
 
   const baseItems = [
@@ -183,7 +196,6 @@ export function Navigation() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : (
-                  // --- UPDATED: OPEN MODAL INSTEAD OF LINK ---
                    <Button onClick={openLogin} variant="default" size="sm" className="ml-2">
                       Login
                    </Button>
@@ -239,7 +251,6 @@ export function Navigation() {
                        </button>
                     </>
                  ) : (
-                    // --- UPDATED MOBILE BUTTON ---
                     <Button onClick={openLogin} className="w-full" variant="default">
                        Login / Sign Up
                     </Button>
@@ -250,10 +261,8 @@ export function Navigation() {
         </div>
       </nav>
 
-      {/* --- AUTH MODAL --- */}
       <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} defaultTab={authTab} />
 
-      {/* --- EXIT CONFIRMATION DIALOG --- */}
       <Dialog open={showExitConfirm} onOpenChange={setShowExitConfirm}>
         <DialogContent className="sm:max-w-[400px]">
             <DialogHeader className="flex flex-col items-center text-center">

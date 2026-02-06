@@ -35,7 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import Image from "next/image";
 import { useAuth } from "@/hooks/use-auth";
-import Link from "next/link";
+import Link from "next/link"; //
 
 export function CartSidebar() {
   const {
@@ -45,13 +45,13 @@ export function CartSidebar() {
     clearCart,
     getTotalItems,
     addOrder,
-  } = useCartStore();
+  } = useCartStore(); //
   const totalItems = getTotalItems();
   const [isOpen, setIsOpen] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
-  const { showSuccess, showError } = useGlobalModal();
+  const { showSuccess, showError } = useGlobalModal(); //
   
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth(); //
   const prevUserIdRef = useRef<string | undefined>(user?.id || (user as any)?._id);
 
   // --- 1. LOGOUT DETECTION (Clear Cart) ---
@@ -66,16 +66,14 @@ export function CartSidebar() {
 // --- 2. GUEST MODE TRIGGER ---
   useEffect(() => {
     if (items.length > 0 && !isAuthenticated) {
-        // A. Call API
         fetch("/api/auth/guest", { method: "POST" })
             .catch(err => console.error("Failed to init guest session", err));
             
-        // B. Set UI Flag (NEW LINE)
         if (typeof window !== "undefined") {
             localStorage.setItem("guest_mode", "true");
         }
     }
-  }, [items.length, isAuthenticated]);
+  }, [items.length, isAuthenticated]); //
 
   // --- VOUCHER LOGIC ---
   const [voucherCode, setVoucherCode] = useState("");
@@ -98,7 +96,7 @@ export function CartSidebar() {
         })
         .catch((err) => console.error("Failed to load vouchers", err));
     }
-  }, [isOpen, isAuthenticated]);
+  }, [isOpen, isAuthenticated]); //
 
   const subTotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const finalTotal = Math.max(0, subTotal - (appliedVoucher?.amount || 0));
@@ -141,7 +139,6 @@ export function CartSidebar() {
         body: JSON.stringify({
           items,
           voucherCode: appliedVoucher?.code,
-          // If user exists use their ID, else mark as GUEST
           userId: user?.id || (user as any)?._id || "GUEST", 
         }),
       });
@@ -177,6 +174,13 @@ export function CartSidebar() {
         setAppliedVoucher(null);
         setVoucherCode("");
     }
+  };
+  
+  // --- NEW: Handle "Login to use vouchers" click ---
+  const handleVoucherLogin = () => {
+    setIsOpen(false); // Close sidebar
+    // Redirect to home with a flag to open the login modal
+    window.location.href = "/?openLogin=true";
   };
 
   return (
@@ -285,10 +289,17 @@ export function CartSidebar() {
                     )}
                   </>
                 ) : (
-                  // GUEST LOCKED VIEW
+                  // GUEST LOCKED VIEW - UPDATED
                   <div className="flex items-center justify-between bg-muted/50 border border-dashed border-gray-300 px-4 py-3 rounded-lg text-sm text-muted-foreground">
                      <div className="flex items-center gap-2"><Lock className="w-4 h-4" /><span>Login to use vouchers</span></div>
-                     <Button variant="link" size="sm" className="h-auto p-0 text-primary" asChild><Link href="/auth">Login</Link></Button>
+                     <Button 
+                        variant="link" 
+                        size="sm" 
+                        className="h-auto p-0 text-primary" 
+                        onClick={handleVoucherLogin}
+                     >
+                        Login
+                     </Button>
                   </div>
                 )}
               </div>
